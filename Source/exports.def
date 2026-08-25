@@ -1,0 +1,5 @@
+LIBRARY "syxg100-hybrid"
+EXPORTS
+    main=VSTPluginMain
+    VSTPluginMain
+

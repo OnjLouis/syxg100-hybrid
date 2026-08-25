@@ -1,0 +1,6 @@
+/build/
+/stage/
+*.dll
+*.exe
+*.wav
+
