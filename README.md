@@ -5,7 +5,7 @@ user-supplied 32-bit Yamaha S-YXG50 VST with separately recovered VL/PVL audio.
 It does not contain or distribute Yamaha executables, tables, presets, or demo
 files.
 
-The current milestone is a transparent VST2 pass-through wrapper. Place a
+The first milestone is a transparent VST2 pass-through wrapper. Place a
 lawfully retained portable S-YXG50 VST beside the wrapper under the filename
 `syxg50-engine.dll`. The wrapper loads that engine and forwards its lifecycle,
 MIDI, parameter, and audio calls unchanged. This provides a measurable baseline
@@ -17,10 +17,22 @@ all 16 MIDI channels and identifies VL/PVL bank MSBs 33, 81, and 97, including
 the transition back to an ordinary XG bank. The router is tested but is not yet
 connected to a production VL worker.
 
-The intended next stage is a 64-bit out-of-process VL worker using fixed-size,
-preallocated IPC buffers. This is required because the Yamaha child VST is
-32-bit while the currently validated CPU-emulation runtime is 64-bit. No Python
-process or dynamic allocation belongs on the VST audio callback.
+The second milestone proves that the recovered PVL engine can initialize and
+render directly as native 32-bit code. `NativeProbe` maps a separately prepared,
+user-supplied PVL image, applies the compatibility layer required by its Windows
+9x VxD assumptions, replays a captured MIDI event trace, and renders through a
+preallocated low-address workspace. Ten clean-process runs of the reference
+trace produced identical plane statistics. A 2,048-frame block took about 5.9
+to 6.5 ms on the development system, comfortably below the 46.4 ms represented
+by that block at 44.1 kHz.
+
+`Worker` retains the earlier 64-bit Unicorn implementation as a research oracle.
+It established correct output before native execution was understood, but its
+roughly 18-times-slower-than-real-time performance rules it out as the shipping
+renderer. The production direction is now an in-process 32-bit native VL engine
+with fixed-size buffers. Runtime loading and relocation of the original
+user-supplied `Sxgpvknl.vxd` is the next prerequisite; this repository contains
+neither a relocated image nor any Yamaha binary data.
 
 ## Build
 
@@ -38,3 +50,15 @@ cmake --build <build-directory>
 sets 44.1 kHz and a 512-frame block, enables processing, renders one silent
 block, and closes it. A successful result confirms the wrapper and child engine
 completed their normal VST lifecycle.
+
+`NativeProbe` is a research executable rather than an end-user conversion tool.
+It currently requires an already relocated PVL image at base `0x10000000` and a
+captured `.pvte.txt` event trace:
+
+```text
+VlNativeProbe <relocated-pv-image.bin> <events.pvte.txt>
+```
+
+Successful reference output has nonzero audio on planes 1, 2, and 4, a silent
+plane 3, and a render time well below real time. Exact peaks can vary when the
+input trace changes.
