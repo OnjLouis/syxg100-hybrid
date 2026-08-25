@@ -20,9 +20,11 @@ constexpr std::size_t leFixupPageTable = 0x68;
 constexpr std::size_t leFixupRecordTable = 0x6c;
 constexpr std::size_t leDataPages = 0x80;
 constexpr std::size_t objectRecordSize = 24;
+constexpr std::size_t objectAlignment = 0x100000;
 constexpr std::uint8_t sourceTypeMask = 0x0f;
 constexpr std::uint8_t sourceListFlag = 0x20;
 constexpr std::uint8_t source32BitOffset = 7;
+constexpr std::uint8_t source32BitRelative = 8;
 constexpr std::uint8_t targetTypeMask = 0x03;
 constexpr std::uint8_t targetInternal = 0;
 constexpr std::uint8_t targetAdditive = 0x04;
@@ -118,6 +120,21 @@ void writePartial32(std::vector<std::uint8_t>& image, std::size_t pageOffset,
     }
 }
 
+std::size_t alignUp(std::size_t value, std::size_t alignment)
+{
+    if (value > std::numeric_limits<std::size_t>::max() - (alignment - 1))
+        throw std::runtime_error("LE object layout is too large");
+    return (value + alignment - 1) & ~(alignment - 1);
+}
+
+struct ObjectLayout {
+    std::uint32_t size {};
+    std::uint32_t declaredBase {};
+    std::uint32_t firstPage {};
+    std::uint32_t pageCount {};
+    std::size_t imageOffset {};
+};
+
 } // namespace
 
 std::vector<std::uint8_t> loadLeImage(const std::filesystem::path& path,
@@ -132,8 +149,8 @@ std::vector<std::uint8_t> loadLeImage(const std::filesystem::path& path,
     }
 
     const auto objectCount = read32(file, header + leObjectCount);
-    if (objectCount != 1)
-        throw std::runtime_error("PVL loader currently requires one LE object");
+    if (objectCount == 0)
+        throw std::runtime_error("LE image contains no objects");
     const auto pageCount = read32(file, header + lePageCount);
     const auto pageSize = read32(file, header + lePageSize);
     const auto lastPageSize = read32(file, header + leLastPageSize);
@@ -141,35 +158,93 @@ std::vector<std::uint8_t> loadLeImage(const std::filesystem::path& path,
         throw std::runtime_error("invalid LE page layout");
 
     const auto objectTable = header + read32(file, header + leObjectTable);
-    requireRange(file, objectTable, objectRecordSize);
-    const auto objectSize = read32(file, objectTable);
-    const auto objectBase = read32(file, objectTable + 4);
-    const auto firstObjectPage = read32(file, objectTable + 12);
-    const auto objectPages = read32(file, objectTable + 16);
-    if (firstObjectPage != 1 || objectPages != pageCount || objectSize == 0)
-        throw std::runtime_error("unsupported LE object layout");
+    if (objectCount > std::numeric_limits<std::size_t>::max()
+                      / objectRecordSize) {
+        throw std::runtime_error("LE object table is too large");
+    }
+    requireRange(file, objectTable,
+                 static_cast<std::size_t>(objectCount) * objectRecordSize);
+    std::vector<ObjectLayout> objects(objectCount);
+    std::vector<bool> assignedPage(pageCount);
+    std::size_t nextObjectOffset = 0;
+    for (std::uint32_t index = 0; index < objectCount; ++index) {
+        const auto record = objectTable + index * objectRecordSize;
+        auto& object = objects[index];
+        object.size = read32(file, record);
+        object.declaredBase = read32(file, record + 4);
+        object.firstPage = read32(file, record + 12);
+        object.pageCount = read32(file, record + 16);
+        if (object.size == 0 || object.firstPage == 0
+            || object.pageCount == 0
+            || object.firstPage - 1 > pageCount
+            || object.pageCount > pageCount - (object.firstPage - 1)) {
+            throw std::runtime_error("invalid LE object layout");
+        }
+        object.imageOffset = index == 0 ? 0
+            : alignUp(nextObjectOffset, objectAlignment);
+        if (object.imageOffset
+            > std::numeric_limits<std::size_t>::max() - object.size) {
+            throw std::runtime_error("LE object image is too large");
+        }
+        nextObjectOffset = object.imageOffset + object.size;
+        for (std::uint32_t objectPage = 0; objectPage < object.pageCount;
+             ++objectPage) {
+            const auto page = object.firstPage - 1 + objectPage;
+            if (assignedPage[page])
+                throw std::runtime_error("LE objects contain overlapping pages");
+            assignedPage[page] = true;
+        }
+    }
+    if (std::find(assignedPage.begin(), assignedPage.end(), false)
+        != assignedPage.end()) {
+        throw std::runtime_error("LE pages are not fully assigned to objects");
+    }
 
     const auto pageTable = header + read32(file, header + lePageTable);
+    if (pageCount > std::numeric_limits<std::size_t>::max() / 4)
+        throw std::runtime_error("LE page table is too large");
+    requireRange(file, pageTable, static_cast<std::size_t>(pageCount) * 4);
     const auto dataPages = static_cast<std::size_t>(
         read32(file, header + leDataPages));
-    std::vector<std::uint8_t> image(objectSize);
-    for (std::uint32_t page = 0; page < pageCount; ++page) {
-        const auto physicalPage = readPageNumber(file, pageTable + page * 4);
-        if (physicalPage == 0)
-            throw std::runtime_error("unsupported empty LE page");
-        const auto bytesOnPage = page + 1 == pageCount ? lastPageSize : pageSize;
-        const auto source = dataPages
-                          + static_cast<std::size_t>(physicalPage - 1) * pageSize;
-        const auto destination = static_cast<std::size_t>(page) * pageSize;
-        requireRange(file, source, bytesOnPage);
-        if (destination > image.size() || bytesOnPage > image.size() - destination)
-            throw std::runtime_error("LE page exceeds object image");
-        std::copy_n(file.begin() + source, bytesOnPage,
-                    image.begin() + destination);
+    std::vector<std::uint8_t> image(nextObjectOffset);
+    std::vector<std::size_t> pageDestinations(pageCount);
+    std::vector<std::uint32_t> pageCapacities(pageCount);
+    for (const auto& object : objects) {
+        for (std::uint32_t objectPage = 0; objectPage < object.pageCount;
+            ++objectPage) {
+            const auto page = object.firstPage - 1 + objectPage;
+            const auto offsetWithinObject = static_cast<std::size_t>(objectPage)
+                                          * pageSize;
+            const auto destination = object.imageOffset + offsetWithinObject;
+            const auto objectBytes = static_cast<std::size_t>(object.size)
+                                   - std::min<std::size_t>(
+                                       object.size, offsetWithinObject);
+            const auto capacity = static_cast<std::uint32_t>(
+                std::min<std::size_t>(pageSize, objectBytes));
+            pageDestinations[page] = destination;
+            pageCapacities[page] = capacity;
+            const auto physicalPage = readPageNumber(file, pageTable + page * 4);
+            if (physicalPage == 0)
+                continue;
+            const auto moduleBytes = page + 1 == pageCount
+                ? lastPageSize : pageSize;
+            const auto bytesOnPage = std::min(capacity, moduleBytes);
+            const auto source = dataPages
+                + static_cast<std::size_t>(physicalPage - 1) * pageSize;
+            requireRange(file, source, bytesOnPage);
+            if (destination > image.size()
+                || bytesOnPage > image.size() - destination) {
+                throw std::runtime_error("LE page exceeds object image");
+            }
+            std::copy_n(file.begin() + source, bytesOnPage,
+                        image.begin() + destination);
+        }
     }
 
     const auto fixupPages = header + read32(file, header + leFixupPageTable);
     const auto fixupRecords = header + read32(file, header + leFixupRecordTable);
+    requireRange(file, fixupPages,
+                 (static_cast<std::size_t>(pageCount) + 1) * 4);
     for (std::uint32_t page = 0; page < pageCount; ++page) {
         auto record = fixupRecords + read32(file, fixupPages + page * 4);
         const auto recordEnd = fixupRecords
@@ -180,7 +255,9 @@ std::vector<std::uint8_t> loadLeImage(const std::filesystem::path& path,
         while (record < recordEnd) {
             const auto sourceType = read8(file, record);
             const auto targetFlags = read8(file, record);
-            if ((sourceType & sourceTypeMask) != source32BitOffset
+            const auto sourceKind = sourceType & sourceTypeMask;
+            if ((sourceKind != source32BitOffset
+                 && sourceKind != source32BitRelative)
                 || (targetFlags & targetTypeMask) != targetInternal) {
                 throw std::runtime_error("unsupported LE fixup type");
             }
@@ -193,10 +270,11 @@ std::vector<std::uint8_t> loadLeImage(const std::filesystem::path& path,
                 sourceOffsets.push_back(static_cast<std::int16_t>(
                     consume16(file, record)));
 
-            const auto objectNumber = (targetFlags & target16BitObject) != 0
-                ? consume16(file, record) : read8(file, record);
-            if (objectNumber != 1)
-                throw std::runtime_error("unsupported LE fixup target object");
+            const auto objectNumber = static_cast<std::uint32_t>(
+                (targetFlags & target16BitObject) != 0
+                    ? consume16(file, record) : read8(file, record));
+            if (objectNumber == 0 || objectNumber > objects.size())
+                throw std::runtime_error("invalid LE fixup target object");
             std::uint32_t targetOffset = (targetFlags & target32BitOffset) != 0
                 ? consume32(file, record) : consume16(file, record);
             if ((targetFlags & targetAdditive) != 0) {
@@ -210,10 +288,21 @@ std::vector<std::uint8_t> loadLeImage(const std::filesystem::path& path,
                         consume16(file, record)));
             }
 
-            const auto value = loadBase + objectBase + targetOffset;
-            const auto pageOffset = static_cast<std::size_t>(page) * pageSize;
-            for (const auto sourceOffset : sourceOffsets)
-                writePartial32(image, pageOffset, pageSize, sourceOffset, value);
+            const auto& targetObject = objects[objectNumber - 1];
+            const auto targetAddress = static_cast<std::uint32_t>(
+                loadBase + targetObject.imageOffset
+                + targetObject.declaredBase + targetOffset);
+            const auto pageOffset = pageDestinations[page];
+            for (const auto sourceOffset : sourceOffsets) {
+                auto value = targetAddress;
+                if (sourceKind == source32BitRelative) {
+                    const auto sourceAddress = static_cast<std::uint32_t>(
+                        loadBase + pageOffset + sourceOffset);
+                    value = targetAddress - (sourceAddress + 4);
+                }
+                writePartial32(image, pageOffset, pageCapacities[page],
+                               sourceOffset, value);
+            }
         }
         if (record != recordEnd)
             throw std::runtime_error("misaligned LE fixup record");

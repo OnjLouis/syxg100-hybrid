@@ -70,6 +70,15 @@ and are not included here.
 VlNativeProbe <Sxgpvknl.vxd> <events.pvte.txt>
 ```
 
+`SgNativeProbe` is an experimental research harness for a user-supplied
+original SG kernel. It validates multi-object LE loading, initialization,
+bounded rendering, MIDI/SysEx transport, and clean shutdown. Native event
+replay is stable, but audible SG synthesis is not yet implemented or claimed.
+
+```text
+SgNativeProbe <sxgsgknl.vxd> [events.sgte.txt] [output.wav]
+```
+
 The reference 2,048-frame render is deterministic and remains comfortably
 faster than real time. The older 64-bit Unicorn worker remains only as a
 research oracle; it is not part of the wrapper's runtime path.

@@ -19,3 +19,11 @@ add_executable(VlNativeProbe
 )
 target_compile_definitions(VlNativeProbe PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX)
 target_link_options(VlNativeProbe PRIVATE -static -static-libgcc -static-libstdc++)
+
+add_executable(SgNativeProbe
+    SgNativeProbe.cpp
+    ../Source/LeImageLoader.cpp
+    ../Source/LeImageLoader.h
+)
+target_compile_definitions(SgNativeProbe PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX)
+target_link_options(SgNativeProbe PRIVATE -static -static-libgcc -static-libstdc++)
