@@ -12,6 +12,8 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 add_executable(VlNativeProbe
     VlNativeProbe.cpp
+    ../Source/LeImageLoader.cpp
+    ../Source/LeImageLoader.h
 )
 target_compile_definitions(VlNativeProbe PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX)
 target_link_options(VlNativeProbe PRIVATE -static -static-libgcc -static-libstdc++)

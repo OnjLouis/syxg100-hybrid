@@ -40,3 +40,12 @@ add_executable(MidiRouterTests
 target_include_directories(MidiRouterTests PRIVATE Source)
 target_link_options(MidiRouterTests PRIVATE -static -static-libgcc -static-libstdc++)
 add_test(NAME MidiRouterTests COMMAND MidiRouterTests)
+
+add_executable(LeImageLoaderTests
+    Tests/LeImageLoaderTests.cpp
+    Source/LeImageLoader.cpp
+    Source/LeImageLoader.h
+)
+target_include_directories(LeImageLoaderTests PRIVATE Source)
+target_link_options(LeImageLoaderTests PRIVATE -static -static-libgcc -static-libstdc++)
+add_test(NAME LeImageLoaderTests COMMAND LeImageLoaderTests)

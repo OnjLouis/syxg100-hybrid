@@ -30,9 +30,9 @@ by that block at 44.1 kHz.
 It established correct output before native execution was understood, but its
 roughly 18-times-slower-than-real-time performance rules it out as the shipping
 renderer. The production direction is now an in-process 32-bit native VL engine
-with fixed-size buffers. Runtime loading and relocation of the original
-user-supplied `Sxgpvknl.vxd` is the next prerequisite; this repository contains
-neither a relocated image nor any Yamaha binary data.
+with fixed-size buffers. The source-only `LeImageLoader` now reconstructs and
+relocates the original user-supplied `Sxgpvknl.vxd` in memory; this repository
+contains neither a relocated image nor any Yamaha binary data.
 
 ## Build
 
@@ -52,11 +52,10 @@ block, and closes it. A successful result confirms the wrapper and child engine
 completed their normal VST lifecycle.
 
 `NativeProbe` is a research executable rather than an end-user conversion tool.
-It currently requires an already relocated PVL image at base `0x10000000` and a
-captured `.pvte.txt` event trace:
+It accepts the user's original PVL VxD and a captured `.pvte.txt` event trace:
 
 ```text
-VlNativeProbe <relocated-pv-image.bin> <events.pvte.txt>
+VlNativeProbe <Sxgpvknl.vxd> <events.pvte.txt>
 ```
 
 Successful reference output has nonzero audio on planes 1, 2, and 4, a silent

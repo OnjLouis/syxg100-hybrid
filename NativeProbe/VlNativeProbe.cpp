@@ -1,5 +1,7 @@
 #include <windows.h>
 
+#include "../Source/LeImageLoader.h"
+
 #include <array>
 #include <csetjmp>
 #include <cstdint>
@@ -145,22 +147,6 @@ LONG WINAPI reportException(EXCEPTION_POINTERS* details)
     std::cerr << '\n';
     std::cerr.flush();
     ExitProcess(2);
-}
-
-std::vector<std::uint8_t> readImage(const std::filesystem::path& path)
-{
-    std::ifstream input(path, std::ios::binary | std::ios::ate);
-    if (!input)
-        throw std::runtime_error("cannot open " + path.string());
-    const auto size = input.tellg();
-    if (size != static_cast<std::streamoff>(imageSize))
-        throw std::runtime_error("image must be exactly 0x1aecdc bytes");
-    std::vector<std::uint8_t> bytes(imageSize);
-    input.seekg(0);
-    input.read(reinterpret_cast<char*>(bytes.data()), size);
-    if (!input)
-        throw std::runtime_error("cannot read " + path.string());
-    return bytes;
 }
 
 std::vector<std::uint8_t> parseHex(std::string_view text)
@@ -392,12 +378,14 @@ int main(int argc, char** argv)
 {
     try {
         if (argc != 3) {
-            std::cerr << "usage: VlNativeProbe <relocated-pv-image.bin> "
+            std::cerr << "usage: VlNativeProbe <Sxgpvknl.vxd> "
                          "<events.pvte.txt>\n";
             return 64;
         }
 
-        const auto image = readImage(argv[1]);
+        const auto image = hybrid::loadLeImage(argv[1], imageBase);
+        if (image.size() != imageSize)
+            throw std::runtime_error("unexpected relocated PVL image size");
         auto* allocation = VirtualAlloc(reinterpret_cast<void*>(imageBase), imageSize,
                                         MEM_RESERVE | MEM_COMMIT,
                                         PAGE_EXECUTE_READWRITE);
