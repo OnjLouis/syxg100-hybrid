@@ -18,10 +18,12 @@ network access, temporary files, Python, or CPU emulation. If the worker or VxD
 is absent or fails, the wrapper remains a transparent XG-only pass-through.
 
 The recovered renderer provides four signed 16-bit stereo planes. Controlled
-MIDI-send tests identify them as dry, reverb return, chorus return, and
-variation return. The wrapper sums all four into S-YXG50's floating-point
-stereo output. MIDI events retain their VST block offsets, including the first
-VL note, and render buffers and queues are fixed in size.
+MIDI-send tests identify them as dry plus unprocessed reverb, chorus, and
+variation send buses. The research wrapper currently sums all four into
+S-YXG50's floating-point stereo output, which preserves their signal but does
+not recreate the missing XG effects path. MIDI events retain their VST block
+offsets, including the first VL note, and render buffers and queues are fixed
+in size.
 
 ## Runtime Layout
 

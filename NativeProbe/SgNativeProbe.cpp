@@ -42,6 +42,7 @@ constexpr std::uintptr_t renderHostBridgeOffset = 0x1460f9;
 constexpr std::uintptr_t outputPlaneSelectorOffset = 0x153bfd;
 constexpr std::size_t outputPlaneStrideSamples = 0x1000;
 constexpr std::size_t outputPlaneCount = 4;
+constexpr std::size_t outputChannelCount = 2;
 constexpr std::size_t sgVoiceCount = 20;
 constexpr std::size_t sgVoiceRecordSize = 0x5c;
 constexpr std::size_t rendererLaneCount = 18;
@@ -327,7 +328,7 @@ void renderFrames(std::uint32_t frames, std::vector<std::int16_t>& rendered)
     // The original SG renderer's fixed scratch area permits at most 388
     // frames; exceeding it overwrites adjacent kernel globals.
     constexpr std::uint32_t blockSize = 256;
-    std::vector<std::int16_t> block(blockSize);
+    std::vector<std::int16_t> block(blockSize * outputChannelCount);
     std::vector<std::int16_t> planes(outputPlaneStrideSamples * outputPlaneCount);
     while (frames != 0) {
         const auto count = std::min(frames, blockSize);
@@ -347,13 +348,20 @@ void renderFrames(std::uint32_t frames, std::vector<std::int16_t>& rendered)
         hostRenderNonzeroSamples += std::count_if(
             planes.begin(), planes.end(), [](auto sample) { return sample != 0; });
         for (std::size_t frame = 0; frame < count; ++frame) {
-            int mixed = 0;
-            for (std::size_t plane = 0; plane < outputPlaneCount; ++plane)
-                mixed += planes[plane * outputPlaneStrideSamples + frame];
-            block[frame] = static_cast<std::int16_t>(std::clamp(
-                mixed, static_cast<int>(INT16_MIN), static_cast<int>(INT16_MAX)));
+            for (std::size_t channel = 0; channel < outputChannelCount; ++channel) {
+                int mixed = 0;
+                for (std::size_t plane = 0; plane < outputPlaneCount; ++plane) {
+                    mixed += planes[plane * outputPlaneStrideSamples
+                                    + frame * outputChannelCount + channel];
+                }
+                block[frame * outputChannelCount + channel]
+                    = static_cast<std::int16_t>(std::clamp(
+                        mixed, static_cast<int>(INT16_MIN),
+                        static_cast<int>(INT16_MAX)));
+            }
         }
-        rendered.insert(rendered.end(), block.begin(), block.begin() + count);
+        rendered.insert(rendered.end(), block.begin(),
+                        block.begin() + count * outputChannelCount);
         frames -= count;
     }
 }
@@ -449,7 +457,8 @@ void replayTrace(std::uintptr_t dispatcher, const std::filesystem::path& path,
                 "note-ons=%zu accepted note-ons=%zu "
                 "maximum legacy flags=%zu "
                 "maximum queued voices after pump=%zu\n",
-                events, rendered.size(), noteOns, acceptedNoteOns,
+                events, rendered.size() / outputChannelCount, noteOns,
+                acceptedNoteOns,
                 maximumActiveVoices, maximumQueuedVoicesAfterPump);
 }
 
@@ -460,10 +469,11 @@ void writeWave(const std::filesystem::path& path,
         samples.size() * sizeof(samples.front()));
     const std::uint32_t riffSize = 36 + dataSize;
     const std::uint32_t sampleRate = 44'100;
-    const std::uint32_t byteRate = sampleRate * sizeof(std::int16_t);
+    const std::uint32_t byteRate = sampleRate * sizeof(std::int16_t)
+        * outputChannelCount;
     const std::uint16_t format = 1;
-    const std::uint16_t channels = 1;
-    const std::uint16_t blockAlign = sizeof(std::int16_t);
+    const std::uint16_t channels = outputChannelCount;
+    const std::uint16_t blockAlign = sizeof(std::int16_t) * outputChannelCount;
     const std::uint16_t bits = 16;
     std::ofstream output(path, std::ios::binary);
     output.write("RIFF", 4);
