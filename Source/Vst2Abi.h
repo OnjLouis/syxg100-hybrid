@@ -63,6 +63,17 @@ struct MidiEvent {
     char reserved2 {};
 };
 
+struct SysexEvent {
+    std::int32_t type { 6 };
+    std::int32_t byteSize { sizeof(SysexEvent) };
+    std::int32_t deltaFrames {};
+    std::int32_t flags {};
+    std::int32_t dumpBytes {};
+    IntPtr reserved1 {};
+    char* sysexDump {};
+    IntPtr reserved2 {};
+};
+
 struct Events {
     std::int32_t numEvents;
     IntPtr reserved {};

@@ -25,8 +25,9 @@ int main()
 {
     hybrid::MidiRouter router;
     bool passed = true;
-    passed &= expect(!router.observeShortMessage(message(0x90, 60, 100)),
-                     "ordinary XG note stays out of VL");
+    passed &= expect(router.routeShortMessage(message(0x90, 60, 100))
+                         == hybrid::MidiDestination::xg,
+                     "ordinary note is routed to XG");
 
     passed &= expect(router.observeShortMessage(message(0xb1, 0, 81)),
                      "VL MSB enters routing on channel 2");
@@ -39,10 +40,17 @@ int main()
     passed &= expect(!router.observeShortMessage(message(0x92, 67, 110)),
                      "other channels remain ordinary XG");
 
-    passed &= expect(router.observeShortMessage(message(0xb1, 0, 0)),
-                     "leaving VL is sent to clear the VL part");
+    passed &= expect(router.routeShortMessage(message(0xb1, 0, 0))
+                         == hybrid::MidiDestination::both,
+                     "leaving VL clears VL and reaches XG");
     passed &= expect(!router.observeShortMessage(message(0x91, 67, 110)),
                      "channel returns to ordinary XG");
+
+    passed &= expect(router.observeShortMessage(message(0xb2, 0, 97)),
+                     "channel enters VL before reset");
+    router.reset();
+    passed &= expect(!router.isVlChannel(2),
+                     "system reset clears remembered VL banks");
 
     for (const auto bank : { 33, 81, 97 }) {
         hybrid::MidiRouter bankRouter;

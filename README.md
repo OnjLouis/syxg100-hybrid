@@ -1,63 +1,75 @@
 # S-YXG100 Hybrid Research Wrapper
 
-This source-only project tests a compatibility architecture for combining a
-user-supplied 32-bit Yamaha S-YXG50 VST with separately recovered VL/PVL audio.
-It does not contain or distribute Yamaha executables, tables, presets, or demo
-files.
+This source-only project combines a user-supplied 32-bit Yamaha S-YXG50 VST
+with separately recovered VL/PVL synthesis. It does not contain or distribute
+Yamaha executables, tables, presets, demo files, or firmware.
 
-The first milestone is a transparent VST2 pass-through wrapper. Place a
-lawfully retained portable S-YXG50 VST beside the wrapper under the filename
-`syxg50-engine.dll`. The wrapper loads that engine and forwards its lifecycle,
-MIDI, parameter, and audio calls unchanged. This provides a measurable baseline
-before VL routing or mixing is added.
+The wrapper keeps S-YXG50 as the proven AWM and effects engine. It routes MIDI
+bank MSBs 33, 81, and 97 to a native PVL engine and leaves ordinary XG parts on
+S-YXG50. Returning a channel from a VL bank to an ordinary bank clears the VL
+part and forwards the transition to XG. GM and XG System On messages reset the
+remembered routing state.
 
-The baseline probe currently renders a real MIDI note through the wrapped
-S-YXG50 engine with a finite nonzero output peak. `MidiRouter` separately tracks
-all 16 MIDI channels and identifies VL/PVL bank MSBs 33, 81, and 97, including
-the transition back to an ordinary XG bank. The router is tested but is not yet
-connected to a production VL worker.
+PVL runs as native 32-bit code in a small worker process. Process isolation is
+required because the two legacy Yamaha engines otherwise overwrite shared
+generated-callback state and crash when XG and VL notes are active together.
+The worker uses inherited anonymous handles and shared memory; it does not use
+network access, temporary files, Python, or CPU emulation. If the worker or VxD
+is absent or fails, the wrapper remains a transparent XG-only pass-through.
 
-The second milestone proves that the recovered PVL engine can initialize and
-render directly as native 32-bit code. `NativeProbe` maps a separately prepared,
-user-supplied PVL image, applies the compatibility layer required by its Windows
-9x VxD assumptions, replays a captured MIDI event trace, and renders through a
-preallocated low-address workspace. Ten clean-process runs of the reference
-trace produced identical plane statistics. A 2,048-frame block took about 5.9
-to 6.5 ms on the development system, comfortably below the 46.4 ms represented
-by that block at 44.1 kHz.
+The recovered renderer provides four signed 16-bit stereo planes. Controlled
+MIDI-send tests identify them as dry, reverb return, chorus return, and
+variation return. The wrapper sums all four into S-YXG50's floating-point
+stereo output. MIDI events retain their VST block offsets, including the first
+VL note, and render buffers and queues are fixed in size.
 
-`Worker` retains the earlier 64-bit Unicorn implementation as a research oracle.
-It established correct output before native execution was understood, but its
-roughly 18-times-slower-than-real-time performance rules it out as the shipping
-renderer. The production direction is now an in-process 32-bit native VL engine
-with fixed-size buffers. The source-only `LeImageLoader` now reconstructs and
-relocates the original user-supplied `Sxgpvknl.vxd` in memory; this repository
-contains neither a relocated image nor any Yamaha binary data.
+## Runtime Layout
+
+Keep these files beside one another in a disposable test VST directory:
+
+```text
+syxg100-hybrid.dll       built by this project
+syxg100-vl-worker.exe    built by this project
+syxg50-engine.dll        user-supplied S-YXG50 VST
+Sxgpvknl.vxd             user-supplied original PVL VxD
+```
+
+Neither user-supplied Yamaha file belongs in this repository or a distributed
+source or binary package.
 
 ## Build
 
-Build output must remain outside this source directory. The project targets
-32-bit Windows because the original Yamaha VST is 32-bit.
+Build output must remain outside this source directory. The wrapper and worker
+target 32-bit Windows because the original engines are 32-bit.
 
 ```text
 cmake -S . -B <build-directory> -G Ninja \
   -DCMAKE_C_COMPILER=<i686-clang> \
   -DCMAKE_CXX_COMPILER=<i686-clang++>
 cmake --build <build-directory>
+ctest --test-dir <build-directory> --output-on-failure
 ```
 
-`HybridHostProbe.exe <wrapper.dll>` opens the wrapper, checks the VST identity,
-sets 44.1 kHz and a 512-frame block, enables processing, renders one silent
-block, and closes it. A successful result confirms the wrapper and child engine
-completed their normal VST lifecycle.
+## Verification Tools
 
-`NativeProbe` is a research executable rather than an end-user conversion tool.
-It accepts the user's original PVL VxD and a captured `.pvte.txt` event trace:
+`HybridHostProbe.exe <wrapper.dll>` verifies the normal XG path. Supplying a
+captured event trace also exercises VL routing and mixing:
+
+```text
+HybridHostProbe <wrapper.dll> [events.pvte.txt]
+```
+
+`HYBRID_PROBE_BLOCKS` controls the number of post-event render blocks.
+`HYBRID_PROBE_NOTE_DELTA` assigns a block offset to trace note events for timing
+checks. Event traces and Yamaha-derived test data are private research inputs
+and are not included here.
+
+`NativeProbe` validates the in-process engine independently of S-YXG50:
 
 ```text
 VlNativeProbe <Sxgpvknl.vxd> <events.pvte.txt>
 ```
 
-Successful reference output has nonzero audio on planes 1, 2, and 4, a silent
-plane 3, and a render time well below real time. Exact peaks can vary when the
-input trace changes.
+The reference 2,048-frame render is deterministic and remains comfortably
+faster than real time. The older 64-bit Unicorn worker remains only as a
+research oracle; it is not part of the wrapper's runtime path.

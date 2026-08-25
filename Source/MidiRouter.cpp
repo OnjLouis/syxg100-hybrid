@@ -2,11 +2,11 @@
 
 namespace hybrid {
 
-bool MidiRouter::observeShortMessage(std::uint32_t packedMessage)
+MidiDestination MidiRouter::routeShortMessage(std::uint32_t packedMessage)
 {
     const auto status = static_cast<std::uint8_t>(packedMessage & 0xff);
     if (status < 0x80 || status >= 0xf0)
-        return false;
+        return MidiDestination::xg;
 
     const auto channel = static_cast<std::uint8_t>(status & 0x0f);
     const auto operation = static_cast<std::uint8_t>(status & 0xf0);
@@ -21,12 +21,25 @@ bool MidiRouter::observeShortMessage(std::uint32_t packedMessage)
 
     const auto isVl = isVlChannel(channel);
     const auto isBankSelection = operation == 0xb0 && (data1 == 0 || data1 == 32);
-    return isVl || (isBankSelection && wasVl);
+    if (isBankSelection && wasVl && !isVl)
+        return MidiDestination::both;
+    return isVl ? MidiDestination::vl : MidiDestination::xg;
+}
+
+bool MidiRouter::observeShortMessage(std::uint32_t packedMessage)
+{
+    return routeShortMessage(packedMessage) != MidiDestination::xg;
 }
 
 bool MidiRouter::isVlChannel(std::uint8_t channel) const
 {
     return channel < bankMsb.size() && isVlBank(bankMsb[channel]);
+}
+
+void MidiRouter::reset()
+{
+    bankMsb.fill(0);
+    bankLsb.fill(0);
 }
 
 bool MidiRouter::isVlBank(std::uint8_t value)
@@ -35,4 +48,3 @@ bool MidiRouter::isVlBank(std::uint8_t value)
 }
 
 } // namespace hybrid
-
