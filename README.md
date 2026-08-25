@@ -22,8 +22,10 @@ MIDI-send tests identify them as dry plus unprocessed reverb, chorus, and
 variation send buses. The research wrapper currently sums all four into
 S-YXG50's floating-point stereo output, which preserves their signal but does
 not recreate the missing XG effects path. MIDI events retain their VST block
-offsets, including the first VL note, and render buffers and queues are fixed
-in size.
+offsets, including the first VL note. Renderer discovery is completed before
+the first Yamaha reset or voice-selection event reaches PVL, while audio
+rendering remains dormant until the first positive VL note-on. Render buffers
+and queues are fixed in size.
 
 ## Runtime Layout
 

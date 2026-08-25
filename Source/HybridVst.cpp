@@ -45,6 +45,7 @@ struct WrapperState {
     std::size_t childBatchCount {};
     float sampleRate {};
     bool vlPrepared {};
+    bool vlStarted {};
     bool vlHasRendered {};
 };
 
@@ -65,6 +66,7 @@ void disableVl(WrapperState& wrapper, const char* context)
     reportVlFailure(context);
     wrapper.pendingVlCount = 0;
     wrapper.vlPrepared = false;
+    wrapper.vlStarted = false;
     wrapper.vlHasRendered = false;
     wrapper.vl.reset();
 }
@@ -78,6 +80,8 @@ void configureVl(WrapperState& wrapper, float sampleRate)
             wrapper.vl = std::make_unique<hybrid::NativeVlClient>(
                 wrapper.workerPath, wrapper.vxdPath,
                 static_cast<std::uint32_t>(std::lround(sampleRate)));
+            wrapper.vlPrepared = false;
+            wrapper.vlStarted = false;
             wrapper.vlHasRendered = false;
         } else if (wrapper.sampleRate != sampleRate) {
             wrapper.vl->setSampleRate(
@@ -96,10 +100,21 @@ std::uint32_t packedMessage(const vst2::MidiEvent& event)
     return packed;
 }
 
-bool isNoteMessage(std::uint32_t packed)
+bool isNoteOn(std::uint32_t packed)
 {
     const auto operation = static_cast<std::uint8_t>(packed & 0xf0);
-    return operation == 0x80 || operation == 0x90;
+    const auto velocity = static_cast<std::uint8_t>((packed >> 16) & 0x7f);
+    return operation == 0x90 && velocity != 0;
+}
+
+void prepareVl(WrapperState& wrapper)
+{
+    if (wrapper.vlPrepared)
+        return;
+    // Renderer discovery mutates PVL state, so it must precede voice setup.
+    // Actual rendering remains gated until the first sounding note.
+    wrapper.vl->prepare();
+    wrapper.vlPrepared = true;
 }
 
 bool isSystemReset(std::span<const std::uint8_t> bytes)
@@ -164,11 +179,10 @@ vst2::IntPtr processEvents(WrapperState& wrapper, const vst2::Events* events)
                 const auto destination = wrapper.router.routeShortMessage(packed);
                 sendToChild = destination != hybrid::MidiDestination::vl;
                 if (destination != hybrid::MidiDestination::xg) {
-                    if (!wrapper.vlPrepared && isNoteMessage(packed)) {
-                        wrapper.vl->prepare();
-                        wrapper.vlPrepared = true;
-                    }
-                    if (wrapper.vlPrepared)
+                    prepareVl(wrapper);
+                    if (isNoteOn(packed))
+                        wrapper.vlStarted = true;
+                    if (wrapper.vlStarted)
                         queueVl(wrapper, midi->deltaFrames, packed);
                     else
                         wrapper.vl->sendShort(packed);
@@ -180,6 +194,7 @@ vst2::IntPtr processEvents(WrapperState& wrapper, const vst2::Events* events)
                         reinterpret_cast<const std::uint8_t*>(sysex->sysexDump),
                         static_cast<std::size_t>(sysex->dumpBytes),
                     };
+                    prepareVl(wrapper);
                     wrapper.vl->sendSysex(bytes);
                     if (isSystemReset(bytes))
                         wrapper.router.reset();
@@ -230,7 +245,7 @@ void renderVlSegment(WrapperState& wrapper, float** outputs,
 
 void mixVl(WrapperState& wrapper, float** outputs, std::int32_t frames)
 {
-    if (wrapper.vl == nullptr || !wrapper.vlPrepared || frames <= 0) {
+    if (wrapper.vl == nullptr || !wrapper.vlStarted || frames <= 0) {
         wrapper.pendingVlCount = 0;
         return;
     }
