@@ -72,8 +72,9 @@ VlNativeProbe <Sxgpvknl.vxd> <events.pvte.txt>
 
 `SgNativeProbe` is an experimental research harness for a user-supplied
 original SG kernel. It validates multi-object LE loading, initialization,
-bounded rendering, MIDI/SysEx transport, and clean shutdown. Native event
-replay is stable, but audible SG synthesis is not yet implemented or claimed.
+bounded rendering, MIDI/SysEx transport, native host mixing, and clean
+shutdown. Native event replay now produces stable nonzero PCM; listening
+quality remains to be validated before integrating SG into the plug-in.
 
 ```text
 SgNativeProbe <sxgsgknl.vxd> [events.sgte.txt] [output.wav]
