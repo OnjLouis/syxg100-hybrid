@@ -40,7 +40,8 @@ did not configure an XG variation algorithm and routing with SysEx.
 
 `Oxygen` passed a custom-VL-voice test after first-worker setup was corrected
 to preserve Yamaha model `0x57` uploads. Its VL-to-XG transition also exercises
-retained note releases across bank changes.
+retained note releases across bank changes. `Dogroova` subsequently passed a
+live playback and transport re-entry test with no missing first note.
 
 ## Useful reports
 
