@@ -38,6 +38,10 @@ one minute of the controller-heavy `StarStrp` without buffering. Processed
 variation effects remain unverified because the retained controller-only probe
 did not configure an XG variation algorithm and routing with SysEx.
 
+`Oxygen` passed a custom-VL-voice test after first-worker setup was corrected
+to preserve Yamaha model `0x57` uploads. Its VL-to-XG transition also exercises
+retained note releases across bank changes.
+
 ## Useful reports
 
 When reporting a problem, include the host and version, sample rate, MIDI file,

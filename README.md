@@ -1,4 +1,4 @@
-# S-YXG100 Hybrid Research Wrapper
+# S-YXG100 Hybrid
 
 For the user-facing overview, runtime layout, current compatibility notes, and
 real-time host instructions, see [`README.html`](README.html).
@@ -6,6 +6,11 @@ real-time host instructions, see [`README.html`](README.html).
 This source-only project combines a user-supplied 32-bit Yamaha S-YXG50 VST
 with separately recovered VL/PVL synthesis. It does not contain or distribute
 Yamaha executables, tables, presets, demo files, or firmware.
+
+S-YXG100 Hybrid brings the discontinued Windows 9x VL/PVL and SG engines into
+a modern Windows VST2 host while retaining S-YXG50 for ordinary XG synthesis
+and Yamaha effects. The recovered engines run as isolated worker processes so
+their legacy generated-code state cannot corrupt the host or one another.
 
 The wrapper keeps S-YXG50 as the proven AWM and effects engine. It routes MIDI
 bank MSBs 33, 81, and 97 to a native PVL engine and leaves ordinary XG parts on
@@ -89,6 +94,21 @@ sxgsgknl.vxd             user-supplied original SG VxD
 
 Neither user-supplied Yamaha file belongs in this repository or a distributed
 source or binary package.
+
+## Portability and macOS
+
+The repository is intentionally public so the preservation work can be studied,
+verified, and extended. The MIDI routing, ordered setup history, voice allocator,
+effects-bus mapping, LE image loader, native-engine interfaces, and behavioural
+tests provide a concrete starting point for another platform.
+
+The current runtime is not directly portable: it loads original 32-bit Windows
+PE/LE code and depends on Win32 process, shared-memory, event, and VST2 APIs.
+A native macOS port would need replacements for that hosting layer and either a
+compatible execution environment for the entitled legacy runtime or a clean
+reimplementation of the recovered synthesis interfaces. Yamaha binaries and
+demonstration files are not licensed by this project and must not be committed
+to a fork or redistributed with a build.
 
 ## Build
 

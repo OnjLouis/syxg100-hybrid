@@ -44,6 +44,12 @@
   reliable XG50 voice and effects path, then routes VL and SG MIDI into
   recovered native engines running in isolated helper processes.</p>
 
+  <p>The source is published so the preservation work can be studied, verified,
+  and extended. The current runtime is a 32-bit Windows VST2 implementation and
+  is not directly portable to macOS: a native port must replace its Win32 host,
+  process, shared-memory, and event integration, and provide a lawful compatible
+  path for the legacy synthesis runtime or reimplement those interfaces.</p>
+
   <h2>Current status</h2>
 
   <p>The current build is validated for real-time use at 44.1 kHz. Listening
@@ -141,7 +147,8 @@ sxgsgknl.vxd</pre>
   compatibility testing; do not republish those Yamaha-derived files without
   the necessary rights. A generally shareable project build should contain only
   the hybrid wrapper, its two workers, this guide, and applicable project
-  licence files.</p>
+  licence files. The project integration code is available under the MIT
+  License.</p>
 </main>
 </body>
 </html>
