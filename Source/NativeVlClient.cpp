@@ -4,6 +4,7 @@
 
 #include <windows.h>
 
+#include <algorithm>
 #include <array>
 #include <cstring>
 #include <stdexcept>
@@ -21,6 +22,12 @@ std::wstring quoted(const std::filesystem::path& path)
 std::wstring handleText(HANDLE handle)
 {
     return std::to_wstring(reinterpret_cast<std::uintptr_t>(handle));
+}
+
+std::runtime_error win32Error(const char* context)
+{
+    return std::runtime_error(std::string(context) + " (Win32 error "
+                              + std::to_string(GetLastError()) + ")");
 }
 
 } // namespace
@@ -86,7 +93,7 @@ public:
         DeleteProcThreadAttributeList(startup.lpAttributeList);
         HeapFree(GetProcessHeap(), 0, startup.lpAttributeList);
         if (!created)
-            throw std::runtime_error("cannot launch native VL worker");
+            throw win32Error("cannot launch native VL worker");
         process = processInfo.hProcess;
         CloseHandle(processInfo.hThread);
         waitForResponse("initialization", 10'000);
@@ -132,15 +139,32 @@ public:
 
     void request(ipc::Command command, std::uint32_t argument = 0)
     {
+        beginRequest(command, argument);
+        finishRequest();
+    }
+
+    void beginRequest(ipc::Command command, std::uint32_t argument = 0)
+    {
+        if (requestPending)
+            throw std::runtime_error("native VL request is already pending");
         shared->argument = argument;
         InterlockedExchange(&shared->result, 0);
         InterlockedExchange(&shared->command, static_cast<LONG>(command));
         if (!SetEvent(requestEvent))
             throw std::runtime_error("cannot signal native VL worker");
+        requestPending = true;
+    }
+
+    void finishRequest()
+    {
+        if (!requestPending)
+            throw std::runtime_error("native VL request is not pending");
         try {
             waitForResponse("request", 2'000);
+            requestPending = false;
         } catch (...) {
             unresponsive = true;
+            requestPending = false;
             throw;
         }
     }
@@ -150,9 +174,22 @@ public:
         const std::array<HANDLE, 2> handles { responseEvent, process };
         const auto result = WaitForMultipleObjects(
             static_cast<DWORD>(handles.size()), handles.data(), FALSE, timeout);
-        if (result != WAIT_OBJECT_0 || shared->result != 0)
-            throw std::runtime_error(std::string("native VL worker ") + stage
-                                     + " failed");
+        if (result == WAIT_OBJECT_0 && shared->result == 0)
+            return;
+        DWORD exitCode = STILL_ACTIVE;
+        if (process != nullptr)
+            GetExitCodeProcess(process, &exitCode);
+        std::string diagnostic;
+        if (shared->diagnosticSize <= shared->diagnostic.size()) {
+            diagnostic.assign(shared->diagnostic.data(),
+                              shared->diagnosticSize);
+        }
+        throw std::runtime_error(
+            std::string("native VL worker ") + stage + " failed (wait="
+            + std::to_string(result) + ", result="
+            + std::to_string(shared->result) + ", exit="
+            + std::to_string(exitCode) + ")"
+            + (diagnostic.empty() ? "" : ": " + diagnostic));
     }
 
     HANDLE mapping {};
@@ -161,6 +198,7 @@ public:
     HANDLE process {};
     ipc::SharedState* shared {};
     bool unresponsive {};
+    bool requestPending {};
 };
 
 NativeVlClient::NativeVlClient(const std::filesystem::path& workerPath,
@@ -191,6 +229,11 @@ void NativeVlClient::setSampleRate(std::uint32_t sampleRate)
     impl->request(ipc::Command::setSampleRate, sampleRate);
 }
 
+void NativeVlClient::warmUp()
+{
+    impl->request(ipc::Command::warmUp);
+}
+
 void NativeVlClient::prepare()
 {
     impl->request(ipc::Command::prepare);
@@ -199,6 +242,23 @@ void NativeVlClient::prepare()
 void NativeVlClient::render(std::uint32_t frames)
 {
     impl->request(ipc::Command::render, frames);
+}
+
+void NativeVlClient::beginTimedRender(
+    std::uint32_t frames, std::span<const ipc::TimedMidiEvent> events)
+{
+    if (events.size() > impl->shared->timedMidiEvents.size())
+        throw std::runtime_error("VL timed MIDI event queue exceeds IPC capacity");
+    std::copy(events.begin(), events.end(),
+              impl->shared->timedMidiEvents.begin());
+    impl->shared->timedMidiEventCount =
+        static_cast<std::uint32_t>(events.size());
+    impl->beginRequest(ipc::Command::renderTimed, frames);
+}
+
+void NativeVlClient::finishTimedRender()
+{
+    impl->finishRequest();
 }
 
 std::span<const std::int16_t> NativeVlClient::plane(

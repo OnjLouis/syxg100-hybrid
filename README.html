@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>S-YXG100 Hybrid - User Guide</title>
+  <style>
+    body {
+      max-width: 52rem;
+      margin: 0 auto;
+      padding: 1.5rem;
+      color: #171717;
+      background: #ffffff;
+      font: 1rem/1.6 system-ui, sans-serif;
+    }
+    h1, h2 { line-height: 1.25; }
+    code, pre { font-family: ui-monospace, monospace; }
+    pre {
+      padding: 1rem;
+      overflow-x: auto;
+      border: 1px solid #767676;
+      background: #f5f5f5;
+    }
+    .important {
+      padding: 0.75rem 1rem;
+      border-left: 0.3rem solid #9c2f00;
+      background: #fff4ee;
+    }
+  </style>
+</head>
+<body>
+<main>
+  <h1>S-YXG100 Hybrid</h1>
+
+  <p>S-YXG100 Hybrid is a recovered 32-bit VST2 instrument that combines
+  the cleaner 4 MB S-YXG50 AWM engine with recovered Yamaha VL/PVL physical
+  modelling and SG singing synthesis from S-YXG100. It was created to make
+  music written for the discontinued Windows 9x S-YXG100 software playable in
+  modern VST hosts.</p>
+
+  <p>The project began as preservation research. Original S-YXG100 songs could
+  still be played in an old virtual machine, but its audio path was restricted
+  and its smaller wave set sounded noticeably worse. The hybrid keeps the
+  reliable XG50 voice and effects path, then routes VL and SG MIDI into
+  recovered native engines running in isolated helper processes.</p>
+
+  <h2>Current status</h2>
+
+  <p>The current build is validated for real-time use at 44.1 kHz. Listening
+  tests have verified ordinary XG playback, legacy monophonic VL, assignment-
+  defined multi-channel PVL, SG singing, calibrated native gain, and Yamaha
+  reverb and chorus processing. Dense-event forwarding, controller timing,
+  voice allocation, and legacy channel routing have been corrected against the
+  original engines and Windows 9x reference playback.</p>
+
+  <p>This remains preservation software rather than a bit-exact emulator. Fast
+  VL pitch bends pass real-time comparison after the wrapper was corrected to
+  preserve complete ordered RPN setup transactions. The retained validation
+  catalogue now plays XG, VL, PVL, and SG correctly in Foobar2000. Processed
+  variation effects remain less thoroughly measured than reverb and chorus.</p>
+
+  <div class="important">
+    <p><strong>Use a host sample rate of 44.1 kHz.</strong> The recovered native
+    VL engine is stable at 44.1 kHz but can stall at 48 kHz. Other rates are not
+    supported until the wrapper gains a streaming sample-rate adapter.</p>
+  </div>
+
+  <h2>Real-time use</h2>
+
+  <p>Load <code>syxg100-hybrid.dll</code> in a 32-bit VST2 host, or in a host
+  that provides a 32-bit bridge. MIDI can then be played from files, a
+  sequencer, or a live controller.</p>
+
+  <p>Foobar2000 with the MIDI Player component can use the instrument through
+  that component's 32-bit VST bridge:</p>
+
+  <ol>
+    <li>Set MIDI Player's sample rate to 44,100 Hz.</li>
+    <li>Add <code>syxg100-hybrid.dll</code> as a VST synthesizer.</li>
+    <li>Select <strong>S-YXG100 Hybrid</strong> for MIDI playback.</li>
+  </ol>
+
+  <p>Its VST ID is <code>S1HY</code>, so it can coexist with the original
+  S-YXG50 without being treated as a duplicate.</p>
+
+  <h2>Runtime files</h2>
+
+  <p>Keep these six files together in one directory:</p>
+
+  <pre>syxg100-hybrid.dll
+syxg100-vl-worker.exe
+syxg100-sg-worker.exe
+syxg50-engine.bin
+Sxgpvknl.vxd
+sxgsgknl.vxd</pre>
+
+  <p>The first three are produced by this project. The final three are original
+  Yamaha runtime files and are not distributed by this project. A tester must
+  provide them from software they are entitled to use. Rename the compatible
+  portable S-YXG50 VST to <code>syxg50-engine.bin</code>. Its contents remain a
+  Windows DLL; the different extension prevents a host from listing this private
+  child engine as a second selectable S-YXG50 VST.</p>
+
+  <h2>Where the synthesis data lives</h2>
+
+  <p>No separate <code>.tbl</code> files are required by this hybrid. The 4 MB
+  XG waveform and table payload is embedded in the resources of the supplied
+  S-YXG50 VST. The recovered VL/PVL and SG model data is contained in
+  <code>Sxgpvknl.vxd</code> and <code>sxgsgknl.vxd</code>. The hybrid DLL itself
+  contains integration code rather than Yamaha waveform data, which is why it
+  is substantially smaller than <code>syxg50-engine.bin</code>.</p>
+
+  <h2>What to expect</h2>
+
+  <ul>
+    <li>Ordinary GM and XG MIDI is rendered by the 4 MB S-YXG50 engine.</li>
+    <li>Bank-select MSBs 33, 81, and 97 activate VL/PVL synthesis.</li>
+    <li>Yamaha model <code>0x5D</code> SysEx activates SG singing synthesis.</li>
+    <li>Legacy VL songs without voice-assignment SysEx retain their original monophonic channel routing.</li>
+    <li>Assignment-defined PVL songs use Yamaha-compatible eight-note polyphony across their assigned source channels.</li>
+    <li>Isolated voice workers render concurrently and consume no callback-keeper CPU while idle.</li>
+    <li>VL and SG reverb and chorus sends pass through the Yamaha XG effects engine.</li>
+    <li>Native output is calibrated against original Windows 9x reference recordings.</li>
+  </ul>
+
+  <h2>Reporting a problem</h2>
+
+  <p>Include the MIDI filename, host and version, sample rate, approximate
+  playback position, and whether the symptom affects ordinary XG, VL/PVL, SG,
+  or only an effect. Useful checks include incorrect banks, missing or stuck
+  notes, fast pitch bends, timing changes, low output, missing effect tails,
+  transport seeking, and repeated song changes.</p>
+
+  <h2>Redistribution</h2>
+
+  <p>The project repository does not distribute Yamaha runtime files,
+  demonstration songs, tables, or firmware. Private preservation test bundles
+  may contain files recovered from an entitled installation solely for
+  compatibility testing; do not republish those Yamaha-derived files without
+  the necessary rights. A generally shareable project build should contain only
+  the hybrid wrapper, its two workers, this guide, and applicable project
+  licence files.</p>
+</main>
+</body>
+</html>

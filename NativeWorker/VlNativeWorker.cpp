@@ -4,16 +4,64 @@
 #include <windows.h>
 
 #include <algorithm>
+#include <cstring>
 #include <cstdint>
+#include <exception>
 #include <filesystem>
 #include <memory>
 #include <span>
+#include <stdexcept>
 
 namespace {
 
 HANDLE parseHandle(const wchar_t* text)
 {
     return reinterpret_cast<HANDLE>(_wcstoui64(text, nullptr, 10));
+}
+
+void setDiagnostic(hybrid::ipc::SharedState& shared, const char* text)
+{
+    const auto length = std::min(std::strlen(text), shared.diagnostic.size());
+    std::copy_n(text, length, shared.diagnostic.begin());
+    shared.diagnosticSize = static_cast<std::uint32_t>(length);
+}
+
+void copyRenderedAudio(hybrid::NativeVlEngine& engine,
+                       hybrid::ipc::SharedState& shared,
+                       std::uint32_t frames, std::uint32_t outputOffset)
+{
+    if (frames == 0)
+        return;
+    engine.render(frames);
+    for (std::size_t index = 0; index < hybrid::ipc::planeCount; ++index) {
+        const auto audio = engine.plane(index, frames);
+        std::copy(audio.begin(), audio.end(),
+                  shared.audio.begin()
+                      + index * hybrid::ipc::maxStereoSamples
+                      + outputOffset * 2);
+    }
+}
+
+void renderTimed(hybrid::NativeVlEngine& engine,
+                 hybrid::ipc::SharedState& shared, std::uint32_t frames)
+{
+    if (frames > hybrid::ipc::maxFrames
+        || shared.timedMidiEventCount
+            > shared.timedMidiEvents.size()) {
+        throw std::runtime_error("invalid timed VL render request");
+    }
+    std::uint32_t position = 0;
+    for (std::uint32_t index = 0;
+         index < shared.timedMidiEventCount; ++index) {
+        const auto& event = shared.timedMidiEvents[index];
+        if (event.frameOffset < position || event.frameOffset > frames)
+            throw std::runtime_error("invalid timed VL MIDI offset");
+        copyRenderedAudio(engine, shared, event.frameOffset - position,
+                          position);
+        engine.sendShort(event.message);
+        position = event.frameOffset;
+    }
+    copyRenderedAudio(engine, shared, frames - position, position);
 }
 
 } // namespace
@@ -46,6 +94,7 @@ int wmain(int argc, wchar_t** argv)
     bool running = true;
     while (running && WaitForSingleObject(requestEvent, INFINITE) == WAIT_OBJECT_0) {
         try {
+            shared->diagnosticSize = 0;
             const auto command = static_cast<hybrid::ipc::Command>(
                 InterlockedExchange(&shared->command, 0));
             switch (command) {
@@ -59,6 +108,9 @@ int wmain(int argc, wchar_t** argv)
                 break;
             case hybrid::ipc::Command::setSampleRate:
                 engine->setSampleRate(shared->argument);
+                break;
+            case hybrid::ipc::Command::warmUp:
+                engine->warmUp();
                 break;
             case hybrid::ipc::Command::prepare:
                 engine->prepare();
@@ -74,6 +126,9 @@ int wmain(int argc, wchar_t** argv)
                 }
                 break;
             }
+            case hybrid::ipc::Command::renderTimed:
+                renderTimed(*engine, *shared, shared->argument);
+                break;
             case hybrid::ipc::Command::shutdown:
                 running = false;
                 break;
@@ -81,7 +136,11 @@ int wmain(int argc, wchar_t** argv)
                 throw 1;
             }
             InterlockedExchange(&shared->result, 0);
+        } catch (const std::exception& error) {
+            setDiagnostic(*shared, error.what());
+            InterlockedExchange(&shared->result, 1);
         } catch (...) {
+            setDiagnostic(*shared, "unknown native VL worker failure");
             InterlockedExchange(&shared->result, 1);
         }
         SetEvent(responseEvent);

@@ -94,6 +94,7 @@ enum EffectOpcode : std::int32_t {
     getEffectName = 45,
     getVendorString = 47,
     getProductString = 48,
+    getVendorVersion = 49,
 };
 
 enum HostOpcode : std::int32_t {

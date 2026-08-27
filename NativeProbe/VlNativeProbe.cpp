@@ -77,15 +77,24 @@ void printStats(const hybrid::NativeVlEngine& engine, std::uint32_t frames)
 int main(int argc, char** argv)
 {
     try {
-        if (argc != 3) {
+        if (argc < 3 || argc > 5) {
             std::cerr << "usage: VlNativeProbe <Sxgpvknl.vxd> "
-                         "<events.pvte.txt>\n";
+                         "<events.pvte.txt> [note-channel [note]]\n";
             return 64;
         }
         hybrid::NativeVlEngine engine(argv[1], 44'100);
         replayTrace(engine, argv[2]);
         engine.prepare();
-        engine.sendShort(0x00643a90);
+        const auto noteChannel = argc == 4
+            ? static_cast<std::uint32_t>(std::stoul(argv[3]))
+            : argc == 5 ? static_cast<std::uint32_t>(std::stoul(argv[3])) : 0u;
+        if (noteChannel >= 16)
+            throw std::runtime_error("note channel must be between 0 and 15");
+        const auto note = argc == 5
+            ? static_cast<std::uint32_t>(std::stoul(argv[4])) : 58u;
+        if (note >= 128)
+            throw std::runtime_error("note must be between 0 and 127");
+        engine.sendShort(0x00640090u | (note << 8) | noteChannel);
         constexpr std::uint32_t frames = 2048;
         const auto start = std::chrono::steady_clock::now();
         engine.render(frames);

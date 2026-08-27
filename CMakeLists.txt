@@ -13,9 +13,18 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 add_library(SYXG100Hybrid SHARED
     Source/MidiRouter.cpp
     Source/MidiRouter.h
+    Source/NativeSgClient.cpp
+    Source/NativeSgClient.h
     Source/NativeVlClient.cpp
     Source/NativeVlClient.h
     Source/NativeVlProtocol.h
+    Source/OrderedSetupHistory.h
+    Source/SgRouting.cpp
+    Source/SgRouting.h
+    Source/VlPartRouter.cpp
+    Source/VlPartRouter.h
+    Source/XgEffectsBridge.cpp
+    Source/XgEffectsBridge.h
     Source/HybridVst.cpp
     Source/Vst2Abi.h
     Source/exports.def
@@ -43,12 +52,39 @@ target_link_options(SYXG100VlWorker PRIVATE
     -municode -static -static-libgcc "-static-libstdc++"
 )
 
+add_executable(SYXG100SgWorker
+    NativeWorker/SgNativeWorker.cpp
+    Source/LeImageLoader.cpp
+    Source/LeImageLoader.h
+    Source/NativeSgEngine.cpp
+    Source/NativeSgEngine.h
+    Source/NativeVlProtocol.h
+)
+set_target_properties(SYXG100SgWorker PROPERTIES
+    OUTPUT_NAME "syxg100-sg-worker"
+)
+target_compile_definitions(SYXG100SgWorker PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX)
+target_link_options(SYXG100SgWorker PRIVATE
+    -municode -static -static-libgcc "-static-libstdc++"
+)
+
 add_executable(HybridHostProbe
     Tests/HybridHostProbe.cpp
     Source/Vst2Abi.h
 )
 target_compile_definitions(HybridHostProbe PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX)
 target_link_options(HybridHostProbe PRIVATE -static -static-libgcc -static-libstdc++)
+
+add_executable(HybridXgForwardingProbe
+    Tests/HybridXgForwardingProbe.cpp
+    Source/Vst2Abi.h
+)
+target_compile_definitions(HybridXgForwardingProbe PRIVATE
+    WIN32_LEAN_AND_MEAN NOMINMAX
+)
+target_link_options(HybridXgForwardingProbe PRIVATE
+    -static -static-libgcc -static-libstdc++
+)
 
 add_executable(HybridDualInstanceProbe
     Tests/HybridDualInstanceProbe.cpp
@@ -79,3 +115,65 @@ add_executable(LeImageLoaderTests
 target_include_directories(LeImageLoaderTests PRIVATE Source)
 target_link_options(LeImageLoaderTests PRIVATE -static -static-libgcc -static-libstdc++)
 add_test(NAME LeImageLoaderTests COMMAND LeImageLoaderTests)
+
+add_executable(VlPartRouterTests
+    Tests/VlPartRouterTests.cpp
+    Source/VlPartRouter.cpp
+    Source/VlPartRouter.h
+)
+target_include_directories(VlPartRouterTests PRIVATE Source)
+target_link_options(VlPartRouterTests PRIVATE
+    -static -static-libgcc -static-libstdc++
+)
+add_test(NAME VlPartRouterTests COMMAND VlPartRouterTests)
+
+add_executable(SgRoutingTests
+    Tests/SgRoutingTests.cpp
+    Source/SgRouting.cpp
+    Source/SgRouting.h
+)
+target_include_directories(SgRoutingTests PRIVATE Source)
+target_link_options(SgRoutingTests PRIVATE
+    -static -static-libgcc -static-libstdc++
+)
+add_test(NAME SgRoutingTests COMMAND SgRoutingTests)
+
+add_executable(NativeEventTimelineTests
+    Tests/NativeEventTimelineTests.cpp
+    Source/NativeEventTimeline.h
+)
+target_include_directories(NativeEventTimelineTests PRIVATE Source)
+target_link_options(NativeEventTimelineTests PRIVATE
+    -static -static-libgcc -static-libstdc++
+)
+add_test(NAME NativeEventTimelineTests COMMAND NativeEventTimelineTests)
+
+add_executable(OrderedMidiHistoryTests
+    Tests/OrderedSetupHistoryTests.cpp
+    Source/OrderedSetupHistory.h
+)
+target_include_directories(OrderedMidiHistoryTests PRIVATE Source)
+target_link_options(OrderedMidiHistoryTests PRIVATE
+    -static -static-libgcc -static-libstdc++
+)
+add_test(NAME OrderedMidiHistoryTests COMMAND OrderedMidiHistoryTests)
+
+add_executable(MidiChannelSnapshotTests
+    Tests/MidiChannelSnapshotTests.cpp
+    Source/MidiChannelSnapshot.h
+)
+target_include_directories(MidiChannelSnapshotTests PRIVATE Source)
+target_link_options(MidiChannelSnapshotTests PRIVATE
+    -static -static-libgcc -static-libstdc++
+)
+add_test(NAME MidiChannelSnapshotTests COMMAND MidiChannelSnapshotTests)
+
+add_executable(VlVoiceAllocatorTests
+    Tests/VlVoiceAllocatorTests.cpp
+    Source/VlVoiceAllocator.h
+)
+target_include_directories(VlVoiceAllocatorTests PRIVATE Source)
+target_link_options(VlVoiceAllocatorTests PRIVATE
+    -static -static-libgcc -static-libstdc++
+)
+add_test(NAME VlVoiceAllocatorTests COMMAND VlVoiceAllocatorTests)

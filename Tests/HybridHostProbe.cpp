@@ -17,7 +17,7 @@
 namespace {
 
 constexpr std::int32_t blockSize = 512;
-constexpr float sampleRate = 44'100.0f;
+float sampleRate = 44'100.0f;
 
 LONG WINAPI reportCrash(EXCEPTION_POINTERS* details)
 {
@@ -55,6 +55,13 @@ int main(int argc, char** argv)
                      "usage: HybridHostProbe <wrapper.dll> [events.pvte.txt]\n");
         return 2;
     }
+    if (const auto* value = std::getenv("HYBRID_PROBE_SAMPLE_RATE")) {
+        sampleRate = std::strtof(value, nullptr);
+        if (sampleRate < 8'000.0f || sampleRate > 192'000.0f) {
+            std::fprintf(stderr, "invalid HYBRID_PROBE_SAMPLE_RATE\n");
+            return 2;
+        }
+    }
     const auto module = LoadLibraryA(argv[1]);
     if (module == nullptr) {
         std::fprintf(stderr, "LoadLibrary failed: %lu\n", GetLastError());
@@ -76,9 +83,11 @@ int main(int argc, char** argv)
 
     std::array<char, 64> name {};
     std::array<char, 64> vendor {};
+    std::array<char, 64> product {};
     effect->dispatcher(effect, vst2::open, 0, 0, nullptr, 0.0f);
     effect->dispatcher(effect, vst2::getEffectName, 0, 0, name.data(), 0.0f);
     effect->dispatcher(effect, vst2::getVendorString, 0, 0, vendor.data(), 0.0f);
+    effect->dispatcher(effect, vst2::getProductString, 0, 0, product.data(), 0.0f);
     effect->dispatcher(effect, vst2::setSampleRate, 0, 0, nullptr, sampleRate);
     effect->dispatcher(effect, vst2::setBlockSize, 0, blockSize, nullptr, 0.0f);
     effect->dispatcher(effect, vst2::mainsChanged, 0, 1, nullptr, 0.0f);
@@ -113,6 +122,7 @@ int main(int argc, char** argv)
         effect->dispatcher(effect, vst2::processEvents, 0, 0, &events, 0.0f);
         renderBlock();
     };
+    std::vector<vst2::MidiEvent> batchedMidi;
 
     if (argc == 2) {
         vst2::MidiEvent noteOn;
@@ -136,7 +146,7 @@ int main(int argc, char** argv)
                 bytes[index] = static_cast<std::uint8_t>(std::stoul(
                     std::string(hex.substr(index * 2, 2)), nullptr, 16));
             }
-            if (line[0] == 'M') {
+            if (line[0] == 'M' || line[0] == 'B') {
                 vst2::MidiEvent midi;
                 std::copy_n(bytes.begin(), std::min<std::size_t>(bytes.size(), 4),
                             midi.midiData);
@@ -146,6 +156,10 @@ int main(int argc, char** argv)
                     && (operation == 0x80 || operation == 0x90)) {
                     midi.deltaFrames = std::clamp(std::atoi(deltaText), 0,
                                                   blockSize);
+                }
+                if (line[0] == 'B') {
+                    batchedMidi.push_back(midi);
+                    continue;
                 }
                 sendEvent(reinterpret_cast<vst2::Event*>(&midi));
                 if (midi.deltaFrames > 0) {
@@ -171,7 +185,27 @@ int main(int argc, char** argv)
                 sendEvent(reinterpret_cast<vst2::Event*>(&sysex));
             }
         }
+        if (!batchedMidi.empty()) {
+            struct MidiBatch {
+                std::int32_t numEvents {};
+                vst2::IntPtr reserved {};
+                std::array<vst2::Event*, 128> events {};
+            } batch;
+            if (batchedMidi.size() > batch.events.size())
+                throw std::runtime_error("probe MIDI batch is too large");
+            batch.numEvents = static_cast<std::int32_t>(batchedMidi.size());
+            for (std::size_t index = 0; index < batchedMidi.size(); ++index) {
+                batch.events[index] = reinterpret_cast<vst2::Event*>(
+                    &batchedMidi[index]);
+            }
+            effect->dispatcher(effect, vst2::processEvents, 0, 0,
+                               &batch, 0.0f);
+            renderBlock();
+        }
     }
+
+    if (const auto* idleText = std::getenv("HYBRID_PROBE_IDLE_MS"))
+        Sleep(static_cast<DWORD>(std::max(0, std::atoi(idleText))));
 
     const auto blockText = std::getenv("HYBRID_PROBE_BLOCKS");
     const auto renderBlocks = blockText == nullptr ? 100
@@ -180,13 +214,19 @@ int main(int argc, char** argv)
         renderBlock();
     }
 
-    std::printf("name=%s vendor=%s programs=%d parameters=%d outputs=%d "
-                "peak=%g hash=%016llx\n",
-                name.data(), vendor.data(), effect->numPrograms,
+    std::printf("name=%s product=%s vendor=%s id=%08x programs=%d "
+                "parameters=%d outputs=%d peak=%g hash=%016llx\n",
+                name.data(), product.data(), vendor.data(),
+                static_cast<unsigned int>(effect->uniqueId), effect->numPrograms,
                 effect->numParams, effect->numOutputs, peak,
                 static_cast<unsigned long long>(sampleHash));
+    const bool identityPassed = std::strcmp(name.data(), "S-YXG100 Hybrid") == 0
+        && std::strcmp(product.data(), "S-YXG100 Hybrid") == 0
+        && std::strcmp(vendor.data(), "Onj Research") == 0
+        && effect->uniqueId == 0x53314859;
     effect->dispatcher(effect, vst2::mainsChanged, 0, 0, nullptr, 0.0f);
     effect->dispatcher(effect, vst2::close, 0, 0, nullptr, 0.0f);
     FreeLibrary(module);
-    return peak > 0.0f && std::isfinite(peak) && timingPassed ? 0 : 6;
+    return peak > 0.0f && std::isfinite(peak) && timingPassed && identityPassed
+        ? 0 : 6;
 }
