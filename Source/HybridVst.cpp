@@ -542,6 +542,13 @@ bool isNoteOff(std::uint32_t packed)
     return operation == 0x80 || (operation == 0x90 && velocity == 0);
 }
 
+bool clearsHeldNotes(std::uint32_t packed)
+{
+    const auto operation = static_cast<std::uint8_t>(packed & 0xf0);
+    const auto controller = static_cast<std::uint8_t>((packed >> 8) & 0x7f);
+    return operation == 0xb0 && (controller == 120 || controller == 123);
+}
+
 std::uint8_t midiNote(std::uint32_t packed)
 {
     return static_cast<std::uint8_t>((packed >> 8) & 0x7f);
@@ -654,7 +661,7 @@ void sendVlSysexForChannel(WrapperState& wrapper,
 }
 
 void replayVlSetup(WrapperState& wrapper, std::uint8_t voice,
-                   std::uint8_t channel)
+                   std::uint8_t channel, bool replaySnapshot)
 {
     auto& client = wrapper.vlVoices[voice].client;
     if (client == nullptr)
@@ -677,12 +684,14 @@ void replayVlSetup(WrapperState& wrapper, std::uint8_t voice,
         sendVlSysexForChannel(wrapper, *client, bytes, channel,
                               nativeChannel);
     }
-    wrapper.vlChannelSnapshots[channel].replay(
-        [&](std::uint32_t message) {
-            const auto nativeMessage = hybrid::remapVlShortMessage(
-                message, nativeChannel);
-            client->sendShort(nativeMessage);
-        });
+    if (replaySnapshot) {
+        wrapper.vlChannelSnapshots[channel].replay(
+            [&](std::uint32_t message) {
+                const auto nativeMessage = hybrid::remapVlShortMessage(
+                    message, nativeChannel);
+                client->sendShort(nativeMessage);
+            });
+    }
 }
 
 void replayVlSysexSetup(WrapperState& wrapper, std::uint8_t voice,
@@ -862,7 +871,13 @@ vst2::IntPtr processEvents(WrapperState& wrapper, const vst2::Events* events)
                                     hybrid::remapVlShortMessage(
                                         packed, nativeChannel);
                                 if (!voice.prepared) {
-                                    replayVlSetup(wrapper, voiceIndex, channel);
+                                    // The first worker already has the complete
+                                    // ordered setup. Replaying bank/program after
+                                    // custom VL SysEx can replace the uploaded voice.
+                                    const bool replayCurrentSnapshot =
+                                        wrapper.vlSetupHistoryFrozen;
+                                    replayVlSetup(wrapper, voiceIndex, channel,
+                                                  replayCurrentSnapshot);
                                     // Warm-up consumes the probe note. Release it
                                     // before restoring setup so the real note is
                                     // not rejected as a duplicate active note.
@@ -870,7 +885,8 @@ vst2::IntPtr processEvents(WrapperState& wrapper, const vst2::Events* events)
                                     client->sendShort(probeNote);
                                     client->warmUp();
                                     client->sendShort(noteRelease(probeNote));
-                                    replayVlSetup(wrapper, voiceIndex, channel);
+                                    replayVlSetup(wrapper, voiceIndex, channel,
+                                                  replayCurrentSnapshot);
                                     client->sendShort(probeNote);
                                     client->render(512);
                                     client->sendShort(noteRelease(probeNote));
@@ -938,6 +954,8 @@ vst2::IntPtr processEvents(WrapperState& wrapper, const vst2::Events* events)
                                 wrapper.vlSetupHistoryFrozen = true;
                             }
                         }
+                        if (clearsHeldNotes(packed))
+                            wrapper.vlVoiceAllocator.releaseChannel(channel);
                     } catch (const std::exception& error) {
                         reportVlFailure("MIDI processing failure", error.what());
                         sendToChild = true;

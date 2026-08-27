@@ -45,4 +45,11 @@ int main()
     assert(allocator.noteOn(4, 60).voice == 2);
     assert(allocator.noteOn(4, 64).voice == 5);
     assert(allocator.noteOn(3, 67).voice == allocator.noVoice);
+
+    allocator.reset();
+    const auto released = allocator.noteOn(0, 60);
+    assert(released.voice == 0);
+    allocator.releaseChannel(0);
+    assert(!allocator.active(0));
+    assert(allocator.channel(0) == 0);
 }

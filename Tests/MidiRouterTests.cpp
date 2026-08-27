@@ -57,5 +57,68 @@ int main()
         passed &= expect(bankRouter.observeShortMessage(message(0xb0, 0, bank)),
                          "documented VL/PVL bank is routed");
     }
+
+    hybrid::MidiRouter releaseRouter;
+    (void)releaseRouter.routeShortMessage(message(0xb0, 0, 33));
+    (void)releaseRouter.routeShortMessage(message(0x90, 48, 90));
+    (void)releaseRouter.routeShortMessage(message(0xb0, 0, 0));
+    passed &= expect(releaseRouter.routeShortMessage(message(0x90, 48, 0))
+                         == hybrid::MidiDestination::both,
+                     "VL note release survives a bank change to XG");
+    passed &= expect(releaseRouter.routeShortMessage(message(0x90, 48, 0))
+                         == hybrid::MidiDestination::xg,
+                     "released VL note no longer affects XG routing");
+
+    hybrid::MidiRouter repeatedNoteRouter;
+    (void)repeatedNoteRouter.routeShortMessage(message(0xb0, 0, 33));
+    (void)repeatedNoteRouter.routeShortMessage(message(0x90, 60, 80));
+    (void)repeatedNoteRouter.routeShortMessage(message(0x90, 60, 100));
+    (void)repeatedNoteRouter.routeShortMessage(message(0xb0, 0, 0));
+    passed &= expect(
+        repeatedNoteRouter.routeShortMessage(message(0x80, 60, 0))
+            == hybrid::MidiDestination::both,
+        "first overlapping VL note release survives a bank change");
+    passed &= expect(
+        repeatedNoteRouter.routeShortMessage(message(0x80, 60, 0))
+            == hybrid::MidiDestination::both,
+        "second overlapping VL note release survives a bank change");
+    passed &= expect(
+        repeatedNoteRouter.routeShortMessage(message(0x80, 60, 0))
+            == hybrid::MidiDestination::xg,
+        "all overlapping VL note releases are eventually cleared");
+
+    hybrid::MidiRouter sustainRouter;
+    (void)sustainRouter.routeShortMessage(message(0xb0, 0, 33));
+    (void)sustainRouter.routeShortMessage(message(0xb0, 64, 127));
+    (void)sustainRouter.routeShortMessage(message(0xb0, 0, 0));
+    passed &= expect(sustainRouter.routeShortMessage(message(0xb0, 64, 0))
+                         == hybrid::MidiDestination::both,
+                     "VL sustain release survives a bank change to XG");
+    passed &= expect(sustainRouter.routeShortMessage(message(0xb0, 64, 0))
+                         == hybrid::MidiDestination::xg,
+                     "released VL sustain no longer affects XG routing");
+
+    hybrid::MidiRouter allNotesOffRouter;
+    (void)allNotesOffRouter.routeShortMessage(message(0xb0, 0, 33));
+    (void)allNotesOffRouter.routeShortMessage(message(0x90, 60, 100));
+    (void)allNotesOffRouter.routeShortMessage(message(0xb0, 0, 0));
+    passed &= expect(
+        allNotesOffRouter.routeShortMessage(message(0xb0, 123, 0))
+            == hybrid::MidiDestination::both,
+        "all-notes-off clears VL notes after a bank change");
+    passed &= expect(
+        allNotesOffRouter.routeShortMessage(message(0x80, 60, 0))
+            == hybrid::MidiDestination::xg,
+        "all-notes-off removes retained VL releases");
+
+    hybrid::MidiRouter resetReleaseRouter;
+    (void)resetReleaseRouter.routeShortMessage(message(0xb0, 0, 33));
+    (void)resetReleaseRouter.routeShortMessage(message(0x90, 60, 100));
+    (void)resetReleaseRouter.routeShortMessage(message(0xb0, 0, 0));
+    resetReleaseRouter.reset();
+    passed &= expect(
+        resetReleaseRouter.routeShortMessage(message(0x80, 60, 0))
+            == hybrid::MidiDestination::xg,
+        "system reset clears retained VL releases");
     return passed ? 0 : 1;
 }

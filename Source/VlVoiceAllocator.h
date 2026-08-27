@@ -113,6 +113,16 @@ public:
             slots[voice] = {};
     }
 
+    void releaseChannel(std::uint8_t channel) noexcept
+    {
+        for (auto& slot : slots) {
+            if (slot.channel != channel)
+                continue;
+            slot.active = false;
+            slot.heldNotes = {};
+        }
+    }
+
 private:
     struct Slot {
         std::uint8_t channel {unassignedChannel};

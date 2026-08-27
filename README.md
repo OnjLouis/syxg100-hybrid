@@ -60,6 +60,10 @@ The pre-activation setup history preserves every short MIDI message in exact
 arrival order. This is required for stateful RPN and NRPN transactions: treating
 CC101, CC100, and Data Entry as independent replaceable controller values can
 turn a valid pitch-bend-range sequence into an ineffective RPN-null sequence.
+The first worker consumes that ordered history directly without appending a
+redundant channel snapshot. This also preserves custom model `0x57` VL voice
+uploads, which can be replaced if bank and program selection are sent again
+after the upload. Workers created later still receive the current snapshot.
 The retained history remains fixed at 1,024 events and never allocates in the
 audio callback.
 
