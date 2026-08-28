@@ -45,6 +45,9 @@ did not configure an XG variation algorithm and routing with SysEx.
 to preserve Yamaha model `0x57` uploads. Its VL-to-XG transition also exercises
 retained note releases across bank changes. `Dogroova` subsequently passed a
 live playback and transport re-entry test with no missing first note.
+The reverse XG-to-VL transition is also covered: a held XG note now receives
+its eventual note-off after entering VL. Sustain release and all-notes-off use
+the same ownership-safe routing, and the correction passed a live QWS test.
 
 ## Useful reports
 

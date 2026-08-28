@@ -22,11 +22,14 @@ public:
 private:
     static bool isVlBank(std::uint8_t bankMsb);
     [[nodiscard]] bool hasHeldVlNotes(std::uint8_t channel) const noexcept;
+    [[nodiscard]] bool hasHeldXgNotes(std::uint8_t channel) const noexcept;
 
     std::array<std::uint8_t, 16> bankMsb {};
     std::array<std::uint8_t, 16> bankLsb {};
     std::array<std::array<std::uint16_t, 128>, 16> heldVlNotes {};
+    std::array<std::array<std::uint16_t, 128>, 16> heldXgNotes {};
     std::array<bool, 16> heldVlSustain {};
+    std::array<bool, 16> heldXgSustain {};
 };
 
 } // namespace hybrid

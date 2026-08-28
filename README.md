@@ -18,6 +18,11 @@ S-YXG50. Returning a channel from a VL bank to an ordinary bank clears the VL
 part and forwards the transition to XG. GM and XG System On messages reset the
 remembered routing state.
 
+Note ownership is retained across bank changes in both directions. If a note,
+sustain pedal, or all-notes-off transaction begins under one engine and its
+channel changes between XG and VL before release, the required release reaches
+both engines. Ordinary events remain routed only to their current owner.
+
 VL/PVL runs as native 32-bit code in a pool of eight lazily created one-voice
 worker processes. Legacy VL files without Yamaha voice-assignment SysEx retain
 their original source channel and the monophonic behaviour of S-YXG100LE.

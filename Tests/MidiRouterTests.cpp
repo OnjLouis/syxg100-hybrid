@@ -120,5 +120,37 @@ int main()
         resetReleaseRouter.routeShortMessage(message(0x80, 60, 0))
             == hybrid::MidiDestination::xg,
         "system reset clears retained VL releases");
+
+    hybrid::MidiRouter xgToVlReleaseRouter;
+    (void)xgToVlReleaseRouter.routeShortMessage(message(0x90, 64, 100));
+    (void)xgToVlReleaseRouter.routeShortMessage(message(0xb0, 0, 33));
+    passed &= expect(
+        xgToVlReleaseRouter.routeShortMessage(message(0x80, 64, 0))
+            == hybrid::MidiDestination::both,
+        "XG note release survives a bank change to VL");
+    passed &= expect(
+        xgToVlReleaseRouter.routeShortMessage(message(0x80, 64, 0))
+            == hybrid::MidiDestination::vl,
+        "released XG note no longer affects VL routing");
+
+    hybrid::MidiRouter xgToVlSustainRouter;
+    (void)xgToVlSustainRouter.routeShortMessage(message(0xb0, 64, 127));
+    (void)xgToVlSustainRouter.routeShortMessage(message(0xb0, 0, 33));
+    passed &= expect(
+        xgToVlSustainRouter.routeShortMessage(message(0xb0, 64, 0))
+            == hybrid::MidiDestination::both,
+        "XG sustain release survives a bank change to VL");
+
+    hybrid::MidiRouter xgToVlAllNotesOffRouter;
+    (void)xgToVlAllNotesOffRouter.routeShortMessage(message(0x90, 67, 100));
+    (void)xgToVlAllNotesOffRouter.routeShortMessage(message(0xb0, 0, 33));
+    passed &= expect(
+        xgToVlAllNotesOffRouter.routeShortMessage(message(0xb0, 123, 0))
+            == hybrid::MidiDestination::both,
+        "all-notes-off clears XG notes after a bank change to VL");
+    passed &= expect(
+        xgToVlAllNotesOffRouter.routeShortMessage(message(0x80, 67, 0))
+            == hybrid::MidiDestination::vl,
+        "all-notes-off removes retained XG releases");
     return passed ? 0 : 1;
 }

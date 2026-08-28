@@ -28,6 +28,12 @@ MidiDestination MidiRouter::routeShortMessage(std::uint32_t packedMessage)
         && (data1 == 120 || data1 == 123);
     const bool retainedAllNotesOff = clearsHeldNotes
         && (hasHeldVlNotes(channel) || heldVlSustain[channel]);
+    const bool retainedXgNoteRelease = noteOff
+        && heldXgNotes[channel][data1] != 0;
+    const bool retainedXgSustainRelease = sustain && data2 < 64
+        && heldXgSustain[channel];
+    const bool retainedXgAllNotesOff = clearsHeldNotes
+        && (hasHeldXgNotes(channel) || heldXgSustain[channel]);
 
     if (operation == 0xb0 && data1 == 0)
         bankMsb[channel] = data2;
@@ -35,27 +41,42 @@ MidiDestination MidiRouter::routeShortMessage(std::uint32_t packedMessage)
         bankLsb[channel] = data2;
 
     const auto isVl = isVlChannel(channel);
-    if (noteOn && isVl) {
-        auto& count = heldVlNotes[channel][data1];
+    if (noteOn) {
+        auto& count = isVl ? heldVlNotes[channel][data1]
+                           : heldXgNotes[channel][data1];
         if (count != std::numeric_limits<std::uint16_t>::max())
             ++count;
-    } else if (noteOff && heldVlNotes[channel][data1] != 0) {
-        --heldVlNotes[channel][data1];
+    } else if (noteOff) {
+        if (heldVlNotes[channel][data1] != 0)
+            --heldVlNotes[channel][data1];
+        if (heldXgNotes[channel][data1] != 0)
+            --heldXgNotes[channel][data1];
     }
     if (sustain) {
-        if (isVl && data2 >= 64)
-            heldVlSustain[channel] = true;
-        else if (data2 < 64)
+        if (data2 >= 64) {
+            if (isVl)
+                heldVlSustain[channel] = true;
+            else
+                heldXgSustain[channel] = true;
+        } else {
             heldVlSustain[channel] = false;
+            heldXgSustain[channel] = false;
+        }
     }
-    if (clearsHeldNotes)
+    if (clearsHeldNotes) {
         heldVlNotes[channel].fill(0);
+        heldXgNotes[channel].fill(0);
+    }
 
     const auto isBankSelection = operation == 0xb0 && (data1 == 0 || data1 == 32);
     if (isBankSelection && wasVl && !isVl)
         return MidiDestination::both;
     if (!isVl && (retainedNoteRelease || retainedSustainRelease
                   || retainedAllNotesOff)) {
+        return MidiDestination::both;
+    }
+    if (isVl && (retainedXgNoteRelease || retainedXgSustainRelease
+                 || retainedXgAllNotesOff)) {
         return MidiDestination::both;
     }
     return isVl ? MidiDestination::vl : MidiDestination::xg;
@@ -77,7 +98,10 @@ void MidiRouter::reset()
     bankLsb.fill(0);
     for (auto& channel : heldVlNotes)
         channel.fill(0);
+    for (auto& channel : heldXgNotes)
+        channel.fill(0);
     heldVlSustain.fill(false);
+    heldXgSustain.fill(false);
 }
 
 bool MidiRouter::isVlBank(std::uint8_t value)
@@ -89,6 +113,13 @@ bool MidiRouter::hasHeldVlNotes(std::uint8_t channel) const noexcept
 {
     return std::any_of(heldVlNotes[channel].begin(),
                        heldVlNotes[channel].end(),
+                       [](std::uint16_t count) { return count != 0; });
+}
+
+bool MidiRouter::hasHeldXgNotes(std::uint8_t channel) const noexcept
+{
+    return std::any_of(heldXgNotes[channel].begin(),
+                       heldXgNotes[channel].end(),
                        [](std::uint16_t count) { return count != 0; });
 }
 
