@@ -52,8 +52,11 @@
 
   <h2>Current status</h2>
 
-  <p>The current build is validated for real-time use at 44.1 kHz. Listening
-  tests have verified ordinary XG playback, legacy monophonic VL, assignment-
+  <p>The current build is validated for real-time use at 44.1 kHz. Complete VL
+  and SG trace renders also pass at 48 kHz through a streaming sample-rate
+  adapter, and live Foobar2000 playback confirms that the former 48 kHz worker
+  stall and crash are gone. Listening tests have verified ordinary XG playback,
+  legacy monophonic VL, assignment-
   defined multi-channel PVL, SG singing, calibrated native gain, and Yamaha
   reverb and chorus processing. Dense-event forwarding, controller timing,
   voice allocation, and legacy channel routing have been corrected against the
@@ -68,9 +71,11 @@
   variation effects remain less thoroughly measured than reverb and chorus.</p>
 
   <div class="important">
-    <p><strong>Use a host sample rate of 44.1 kHz.</strong> The recovered native
-    VL engine is stable at 44.1 kHz but can stall at 48 kHz. Other rates are not
-    supported until the wrapper gains a streaming sample-rate adapter.</p>
+    <p><strong>Host rates of 44.1 and 48 kHz are supported.</strong> The recovered
+    VL and SG engines remain fixed at their proven 44.1 kHz native rate. At
+    48 kHz, the wrapper converts their separate dry and effect-send buses while
+    preserving continuous timing across host blocks. Other rates are not yet
+    validated.</p>
   </div>
 
   <h2>Real-time use</h2>
@@ -83,7 +88,7 @@
   that component's 32-bit VST bridge:</p>
 
   <ol>
-    <li>Set MIDI Player's sample rate to 44,100 Hz.</li>
+    <li>Set MIDI Player's sample rate to 44,100 or 48,000 Hz.</li>
     <li>Add <code>syxg100-hybrid.dll</code> as a VST synthesizer.</li>
     <li>Select <strong>S-YXG100 Hybrid</strong> for MIDI playback.</li>
   </ol>

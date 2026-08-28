@@ -21,6 +21,8 @@ add_library(SYXG100Hybrid SHARED
     Source/OrderedSetupHistory.h
     Source/SgRouting.cpp
     Source/SgRouting.h
+    Source/StreamingRateAdapter.cpp
+    Source/StreamingRateAdapter.h
     Source/VlPartRouter.cpp
     Source/VlPartRouter.h
     Source/XgEffectsBridge.cpp
@@ -177,3 +179,14 @@ target_link_options(VlVoiceAllocatorTests PRIVATE
     -static -static-libgcc -static-libstdc++
 )
 add_test(NAME VlVoiceAllocatorTests COMMAND VlVoiceAllocatorTests)
+
+add_executable(StreamingRateAdapterTests
+    Tests/StreamingRateAdapterTests.cpp
+    Source/StreamingRateAdapter.cpp
+    Source/StreamingRateAdapter.h
+)
+target_include_directories(StreamingRateAdapterTests PRIVATE Source)
+target_link_options(StreamingRateAdapterTests PRIVATE
+    -static -static-libgcc -static-libstdc++
+)
+add_test(NAME StreamingRateAdapterTests COMMAND StreamingRateAdapterTests)

@@ -5,6 +5,7 @@
 #include "NativeVlClient.h"
 #include "OrderedSetupHistory.h"
 #include "SgRouting.h"
+#include "StreamingRateAdapter.h"
 #include "VlPartRouter.h"
 #include "VlVoiceAllocator.h"
 #include "Vst2Abi.h"
@@ -42,6 +43,7 @@ constexpr std::size_t maxChildEventBatches = 8;
 constexpr float int16Scale = 1.0f / 32768.0f;
 constexpr float defaultNativeOutputGain = 3.5f;
 constexpr float xgInternalBusScale = 32768.0f;
+constexpr std::uint32_t nativeSampleRate = 44'100;
 constexpr std::size_t vlOutputBusCount = hybrid::ipc::planeCount * 2;
 constexpr std::size_t xgCachedFramesOffset = 0x100;
 constexpr std::int32_t hybridUniqueId = 0x53314859; // "S1HY"
@@ -78,6 +80,7 @@ enum class PendingSgKind : std::uint8_t {
 
 struct PendingSgEvent {
     PendingSgKind kind {};
+    std::uint64_t frame {};
     std::int32_t deltaFrames {};
     std::uint32_t value {};
     std::uint32_t dataOffset {};
@@ -122,6 +125,7 @@ struct SgState {
     std::array<std::uint8_t, maxVlSetupSysexBytes> pendingSysex {};
     std::size_t pendingSysexSize {};
     std::uint32_t routeMask {};
+    std::uint64_t timelineFrame {};
     bool started {};
     bool disabled {};
 };
@@ -162,6 +166,9 @@ struct WrapperState {
         vlTimedMidiScratch {};
     std::vector<float> vlOutputBuses;
     std::size_t vlOutputCapacityFrames {};
+    std::vector<float> nativeOutputBuses;
+    std::size_t nativeOutputCapacityFrames {};
+    hybrid::StreamingRateAdapter nativeRateAdapter;
     std::size_t vlEffectsCursor {};
     float sampleRate {};
     float nativeOutputGain {defaultNativeOutputGain};
@@ -174,6 +181,36 @@ struct WrapperState {
     bool vlHookDiagnosticWritten {};
     bool xgBusDiagnosticWritten {};
 };
+
+std::uint64_t nativeFrame(const WrapperState& wrapper,
+                          std::uint64_t hostFrame) noexcept
+{
+    const auto hostRate = static_cast<std::uint32_t>(
+        std::max(1.0f, std::round(wrapper.sampleRate)));
+    return hybrid::hostFrameToNative(hostFrame, nativeSampleRate, hostRate);
+}
+
+void configureAudioBuffers(WrapperState& wrapper,
+                           std::size_t requestedFrames)
+{
+    const auto quantum = static_cast<std::size_t>(
+        hybrid::XgEffectsBridge::quantumFrames);
+    wrapper.vlOutputCapacityFrames = (requestedFrames + quantum - 1)
+        / quantum * quantum;
+    wrapper.vlOutputBuses.assign(
+        wrapper.vlOutputCapacityFrames * vlOutputBusCount, 0.0f);
+
+    const auto hostRate = static_cast<std::uint32_t>(
+        std::max(1.0f, std::round(wrapper.sampleRate)));
+    wrapper.nativeRateAdapter.configure(
+        nativeSampleRate, hostRate, vlOutputBusCount,
+        wrapper.vlOutputCapacityFrames);
+    wrapper.nativeOutputCapacityFrames = static_cast<std::size_t>(std::ceil(
+        wrapper.vlOutputCapacityFrames
+        * (static_cast<double>(nativeSampleRate) / hostRate))) + 4;
+    wrapper.nativeOutputBuses.assign(
+        wrapper.nativeOutputCapacityFrames * vlOutputBusCount, 0.0f);
+}
 
 WrapperState* state(vst2::AEffect* effect)
 {
@@ -420,9 +457,10 @@ void disableSg(WrapperState& wrapper, const char* context,
 
 void resetVlPlaybackState(WrapperState& wrapper)
 {
+    wrapper.nativeRateAdapter.reset();
     for (auto& voice : wrapper.vlVoices) {
         voice.pendingCount = 0;
-        voice.timelineFrame = wrapper.sgTimelineFrames;
+        voice.timelineFrame = nativeFrame(wrapper, wrapper.sgTimelineFrames);
         voice.prepared = false;
         voice.started = false;
     }
@@ -433,6 +471,7 @@ void resetVlPlaybackState(WrapperState& wrapper)
     wrapper.sg.pendingCount = 0;
     wrapper.sg.pendingSysexSize = 0;
     wrapper.sg.routeMask = 0;
+    wrapper.sg.timelineFrame = nativeFrame(wrapper, wrapper.sgTimelineFrames);
     if (wrapper.sg.client == nullptr)
         wrapper.sgSetupHistoryFrozen = false;
 }
@@ -449,8 +488,7 @@ hybrid::NativeVlClient* ensureVlVoice(WrapperState& wrapper,
         return state.client.get();
     try {
         state.client = std::make_unique<hybrid::NativeVlClient>(
-            wrapper.workerPath, wrapper.vxdPath,
-            static_cast<std::uint32_t>(std::lround(wrapper.sampleRate)));
+            wrapper.workerPath, wrapper.vxdPath, nativeSampleRate);
         return state.client.get();
     } catch (const std::exception& error) {
         disableVlVoice(wrapper, voice, "initialization failure", error.what());
@@ -468,8 +506,7 @@ hybrid::NativeSgClient* ensureSg(WrapperState& wrapper)
         return wrapper.sg.client.get();
     try {
         wrapper.sg.client = std::make_unique<hybrid::NativeSgClient>(
-            wrapper.sgWorkerPath, wrapper.sgVxdPath,
-            static_cast<std::uint32_t>(std::lround(wrapper.sampleRate)));
+            wrapper.sgWorkerPath, wrapper.sgVxdPath, nativeSampleRate);
         wrapper.sg.started = true;
         return wrapper.sg.client.get();
     } catch (const std::exception& error) {
@@ -496,29 +533,21 @@ void configureVl(WrapperState& wrapper, float sampleRate)
         clearSg(wrapper);
     if (!changed)
         return;
-    for (std::uint8_t voice = 0; voice < wrapper.vlVoices.size(); ++voice) {
-        auto& state = wrapper.vlVoices[voice];
-        if (state.client == nullptr)
-            continue;
+    if (wrapper.vlOutputCapacityFrames != 0) {
         try {
-            state.client->setSampleRate(
-                static_cast<std::uint32_t>(std::lround(sampleRate)));
+            configureAudioBuffers(wrapper, wrapper.vlOutputCapacityFrames);
         } catch (const std::exception& error) {
-            disableVlVoice(wrapper, voice, "sample-rate change", error.what());
-        } catch (...) {
-            disableVlVoice(wrapper, voice, "sample-rate change");
+            wrapper.vlOutputCapacityFrames = 0;
+            wrapper.vlOutputBuses.clear();
+            wrapper.nativeOutputCapacityFrames = 0;
+            wrapper.nativeOutputBuses.clear();
+            reportVlFailure("sample-rate buffer allocation failure",
+                            error.what());
         }
     }
-    if (wrapper.sg.client != nullptr) {
-        try {
-            wrapper.sg.client->setSampleRate(
-                static_cast<std::uint32_t>(std::lround(sampleRate)));
-        } catch (const std::exception& error) {
-            disableSg(wrapper, "sample-rate change", error.what());
-        } catch (...) {
-            disableSg(wrapper, "sample-rate change");
-        }
-    }
+    for (auto& voice : wrapper.vlVoices)
+        voice.timelineFrame = nativeFrame(wrapper, wrapper.sgTimelineFrames);
+    wrapper.sg.timelineFrame = nativeFrame(wrapper, wrapper.sgTimelineFrames);
 }
 
 std::uint32_t packedMessage(const vst2::MidiEvent& event)
@@ -728,10 +757,15 @@ void replaySgSetup(WrapperState& wrapper, std::uint64_t triggerFrame)
 {
     if (wrapper.sg.client == nullptr)
         return;
-    auto position = wrapper.sgSetupBaseFrame;
+    const auto convertFrame = [&](std::uint64_t frame) {
+        return wrapper.nativeRateAdapter.active()
+            ? nativeFrame(wrapper, frame) : frame;
+    };
+    auto position = convertFrame(wrapper.sgSetupBaseFrame);
     for (std::size_t index = 0; index < wrapper.sgSetupEventCount; ++index) {
         const auto& event = wrapper.sgSetupEvents[index];
-        const auto eventFrame = std::max(position, event.absoluteFrame);
+        const auto eventFrame = std::max(
+            position, convertFrame(event.absoluteFrame));
         renderSgSetupDelay(*wrapper.sg.client, eventFrame - position);
         if (event.kind == VlSetupKind::shortMessage) {
             wrapper.sg.client->sendShort(event.value);
@@ -742,8 +776,11 @@ void replaySgSetup(WrapperState& wrapper, std::uint64_t triggerFrame)
         }
         position = eventFrame;
     }
+    const auto nativeTrigger = convertFrame(triggerFrame);
     renderSgSetupDelay(*wrapper.sg.client,
-                       std::max(position, triggerFrame) - position);
+                       std::max(position, nativeTrigger) - position);
+    if (wrapper.nativeRateAdapter.active())
+        wrapper.sg.timelineFrame = std::max(position, nativeTrigger);
 }
 
 bool isSystemReset(std::span<const std::uint8_t> bytes)
@@ -760,26 +797,34 @@ void queueVl(WrapperState& wrapper, VlVoiceState& voice,
              std::int32_t deltaFrames, std::uint32_t message)
 {
     const hybrid::TimedNativeMidi event {
-        hybrid::scheduleNativeMidiFrame(wrapper.sgTimelineFrames, deltaFrames),
+        nativeFrame(wrapper, wrapper.sgTimelineFrames
+            + static_cast<std::uint64_t>(std::max(0, deltaFrames)))
+            + hybrid::nativeMidiLookaheadFrames,
         message,
     };
     if (!hybrid::queueNativeMidi(voice.pending, voice.pendingCount, event))
         throw std::runtime_error("native VL event queue is full");
 }
 
-void queueSgShort(SgState& state, std::int32_t deltaFrames,
-                  std::uint32_t message)
+void queueSgShort(WrapperState& wrapper, std::int32_t deltaFrames,
+                   std::uint32_t message)
 {
+    auto& state = wrapper.sg;
     if (state.pendingCount == state.pending.size())
         throw std::runtime_error("native SG event queue is full");
-    state.pending[state.pendingCount++] = {
-        PendingSgKind::shortMessage, deltaFrames, message, 0, 0
+    const PendingSgEvent event {
+        PendingSgKind::shortMessage,
+        nativeFrame(wrapper, wrapper.sgTimelineFrames
+            + static_cast<std::uint64_t>(std::max(0, deltaFrames))),
+        deltaFrames, message, 0, 0
     };
+    state.pending[state.pendingCount++] = event;
 }
 
-void queueSgSysex(SgState& state, std::int32_t deltaFrames,
-                  std::span<const std::uint8_t> bytes)
+void queueSgSysex(WrapperState& wrapper, std::int32_t deltaFrames,
+                   std::span<const std::uint8_t> bytes)
 {
+    auto& state = wrapper.sg;
     if (state.pendingCount == state.pending.size()
         || bytes.size() > state.pendingSysex.size()
             - state.pendingSysexSize) {
@@ -789,11 +834,15 @@ void queueSgSysex(SgState& state, std::int32_t deltaFrames,
     std::copy(bytes.begin(), bytes.end(),
               state.pendingSysex.begin() + offset);
     state.pendingSysexSize += bytes.size();
-    state.pending[state.pendingCount++] = {
-        PendingSgKind::sysex, deltaFrames, 0,
+    const PendingSgEvent event {
+        PendingSgKind::sysex,
+        nativeFrame(wrapper, wrapper.sgTimelineFrames
+            + static_cast<std::uint64_t>(std::max(0, deltaFrames))),
+        deltaFrames, 0,
         static_cast<std::uint32_t>(offset),
         static_cast<std::uint32_t>(bytes.size())
     };
+    state.pending[state.pendingCount++] = event;
 }
 
 void retainChildEvent(WrapperState& wrapper, vst2::Event* event, bool forceNew)
@@ -893,7 +942,8 @@ vst2::IntPtr processEvents(WrapperState& wrapper, const vst2::Events* events)
                                     client->prepare();
                                     voice.prepared = true;
                                     voice.started = true;
-                                    voice.timelineFrame = wrapper.sgTimelineFrames;
+                                    voice.timelineFrame = nativeFrame(
+                                        wrapper, wrapper.sgTimelineFrames);
                                     wrapper.vlSetupHistoryFrozen = true;
                                 } else if (allocation.reassigned) {
                                     replayVlSysexSetup(wrapper, voiceIndex,
@@ -966,7 +1016,7 @@ vst2::IntPtr processEvents(WrapperState& wrapper, const vst2::Events* events)
                 }
                 if (wrapper.sg.client != nullptr && wrapper.sg.started) {
                     try {
-                        queueSgShort(wrapper.sg, midi->deltaFrames, packed);
+                        queueSgShort(wrapper, midi->deltaFrames, packed);
                         if (hybrid::sgOwnsNote(packed,
                                                wrapper.sg.routeMask)) {
                             sendToChild = false;
@@ -1025,8 +1075,7 @@ vst2::IntPtr processEvents(WrapperState& wrapper, const vst2::Events* events)
                                 replaySgSetup(wrapper, eventFrame);
                                 wrapper.sgSetupHistoryFrozen = true;
                             }
-                            queueSgSysex(wrapper.sg, sysex->deltaFrames,
-                                         bytes);
+                            queueSgSysex(wrapper, sysex->deltaFrames, bytes);
                         }
                     } catch (const std::exception& error) {
                         disableSg(wrapper, "SysEx processing failure",
@@ -1097,13 +1146,19 @@ float* vlBus(WrapperState& wrapper, std::size_t bus)
         + bus * wrapper.vlOutputCapacityFrames;
 }
 
+float* nativeBus(WrapperState& wrapper, std::size_t bus)
+{
+    return wrapper.nativeOutputBuses.data()
+        + bus * wrapper.nativeOutputCapacityFrames;
+}
+
 void mixVlChannelBlock(WrapperState& wrapper, VlVoiceState& voice,
                        std::int32_t outputOffset, std::uint32_t frames)
 {
     for (std::size_t plane = 0; plane < hybrid::ipc::planeCount; ++plane) {
         const auto stereo = voice.client->plane(plane, frames);
-        auto* left = vlBus(wrapper, plane * 2);
-        auto* right = vlBus(wrapper, plane * 2 + 1);
+        auto* left = nativeBus(wrapper, plane * 2);
+        auto* right = nativeBus(wrapper, plane * 2 + 1);
         for (std::uint32_t frame = 0; frame < frames; ++frame) {
             left[outputOffset + frame] += stereo[frame * 2] * int16Scale;
             right[outputOffset + frame] += stereo[frame * 2 + 1]
@@ -1147,8 +1202,8 @@ void renderSgSegment(WrapperState& wrapper, std::int32_t outputOffset,
         wrapper.sg.client->render(block);
         for (std::size_t plane = 0; plane < hybrid::ipc::planeCount; ++plane) {
             const auto stereo = wrapper.sg.client->plane(plane, block);
-            auto* left = vlBus(wrapper, plane * 2);
-            auto* right = vlBus(wrapper, plane * 2 + 1);
+            auto* left = nativeBus(wrapper, plane * 2);
+            auto* right = nativeBus(wrapper, plane * 2 + 1);
             for (std::uint32_t frame = 0; frame < block; ++frame) {
                 left[outputOffset + frame] += stereo[frame * 2] * int16Scale;
                 right[outputOffset + frame] += stereo[frame * 2 + 1]
@@ -1169,13 +1224,50 @@ void renderSg(WrapperState& wrapper, std::int32_t frames,
         return;
     }
     try {
-        std::int32_t position = 0;
-        for (std::size_t index = 0; index < wrapper.sg.pendingCount; ++index) {
+        if (!wrapper.nativeRateAdapter.active()) {
+            std::int32_t position = 0;
+            for (std::size_t index = 0;
+                 index < wrapper.sg.pendingCount; ++index) {
+                const auto eventPosition = std::clamp(
+                    wrapper.sg.pending[index].deltaFrames - cachedPrefix,
+                    position, frames);
+                renderSgSegment(wrapper, position, eventPosition - position);
+                const auto& event = wrapper.sg.pending[index];
+                if (event.kind == PendingSgKind::shortMessage) {
+                    wrapper.sg.client->sendShort(event.value);
+                } else {
+                    wrapper.sg.client->sendSysex({
+                        wrapper.sg.pendingSysex.data() + event.dataOffset,
+                        event.dataSize
+                    });
+                    const auto routeMask = wrapper.sg.client->routeMask();
+                    if (routeMask != wrapper.sg.routeMask) {
+                        wrapper.sg.routeMask = routeMask;
+                        reportSgDiagnostic("configured", wrapper.sgAvailable,
+                                           wrapper.sg.routeMask);
+                    }
+                }
+                position = eventPosition;
+            }
+            renderSgSegment(wrapper, position, frames - position);
+            wrapper.sg.pendingCount = 0;
+            wrapper.sg.pendingSysexSize = 0;
+            return;
+        }
+
+        const auto startFrame = wrapper.sg.timelineFrame;
+        const auto endFrame = startFrame
+            + static_cast<std::uint64_t>(std::max(0, frames));
+        auto position = startFrame;
+        std::size_t consumed = 0;
+        while (consumed < wrapper.sg.pendingCount
+               && wrapper.sg.pending[consumed].frame <= endFrame) {
             const auto eventPosition = std::clamp(
-                wrapper.sg.pending[index].deltaFrames - cachedPrefix,
-                position, frames);
-            renderSgSegment(wrapper, position, eventPosition - position);
-            const auto& event = wrapper.sg.pending[index];
+                wrapper.sg.pending[consumed].frame, position, endFrame);
+            renderSgSegment(
+                wrapper, static_cast<std::int32_t>(position - startFrame),
+                static_cast<std::int32_t>(eventPosition - position));
+            const auto& event = wrapper.sg.pending[consumed];
             if (event.kind == PendingSgKind::shortMessage) {
                 wrapper.sg.client->sendShort(event.value);
             } else {
@@ -1191,10 +1283,20 @@ void renderSg(WrapperState& wrapper, std::int32_t frames,
                 }
             }
             position = eventPosition;
+            ++consumed;
         }
-        renderSgSegment(wrapper, position, frames - position);
-        wrapper.sg.pendingCount = 0;
-        wrapper.sg.pendingSysexSize = 0;
+        renderSgSegment(
+            wrapper, static_cast<std::int32_t>(position - startFrame),
+            static_cast<std::int32_t>(endFrame - position));
+        wrapper.sg.timelineFrame = endFrame;
+        if (consumed != 0) {
+            std::move(wrapper.sg.pending.begin() + consumed,
+                      wrapper.sg.pending.begin() + wrapper.sg.pendingCount,
+                      wrapper.sg.pending.begin());
+            wrapper.sg.pendingCount -= consumed;
+        }
+        if (wrapper.sg.pendingCount == 0)
+            wrapper.sg.pendingSysexSize = 0;
     } catch (const std::exception& error) {
         disableSg(wrapper, "audio rendering failure", error.what());
     } catch (...) {
@@ -1202,15 +1304,16 @@ void renderSg(WrapperState& wrapper, std::int32_t frames,
     }
 }
 
-bool renderVl(WrapperState& wrapper, std::int32_t frames,
-              std::int32_t cachedPrefix)
+bool renderNativeAudio(WrapperState& wrapper, std::int32_t frames,
+                       std::int32_t cachedPrefix)
 {
     if (frames < 0
-        || static_cast<std::size_t>(frames) > wrapper.vlOutputCapacityFrames) {
+        || static_cast<std::size_t>(frames)
+            > wrapper.nativeOutputCapacityFrames) {
         return false;
     }
     for (std::size_t bus = 0; bus < vlOutputBusCount; ++bus) {
-        std::fill_n(vlBus(wrapper, bus), frames, 0.0f);
+        std::fill_n(nativeBus(wrapper, bus), frames, 0.0f);
     }
     std::int32_t outputOffset = 0;
     while (outputOffset < frames) {
@@ -1245,6 +1348,40 @@ bool renderVl(WrapperState& wrapper, std::int32_t frames,
         outputOffset += static_cast<std::int32_t>(block);
     }
     renderSg(wrapper, frames, cachedPrefix);
+    return true;
+}
+
+bool renderVl(WrapperState& wrapper, std::int32_t frames,
+              std::int32_t cachedPrefix)
+{
+    if (frames < 0
+        || static_cast<std::size_t>(frames) > wrapper.vlOutputCapacityFrames) {
+        return false;
+    }
+    for (std::size_t bus = 0; bus < vlOutputBusCount; ++bus)
+        std::fill_n(vlBus(wrapper, bus), frames, 0.0f);
+
+    if (!wrapper.nativeRateAdapter.active()) {
+        if (!renderNativeAudio(wrapper, frames, cachedPrefix))
+            return false;
+        for (std::size_t bus = 0; bus < vlOutputBusCount; ++bus) {
+            std::copy_n(nativeBus(wrapper, bus), frames, vlBus(wrapper, bus));
+        }
+    } else {
+        const auto needed = wrapper.nativeRateAdapter.inputFramesNeeded(
+            static_cast<std::size_t>(frames));
+        if (!renderNativeAudio(wrapper, static_cast<std::int32_t>(needed), 0))
+            return false;
+        std::array<const float*, vlOutputBusCount> input {};
+        std::array<float*, vlOutputBusCount> output {};
+        for (std::size_t bus = 0; bus < vlOutputBusCount; ++bus) {
+            input[bus] = nativeBus(wrapper, bus);
+            output[bus] = vlBus(wrapper, bus);
+        }
+        wrapper.nativeRateAdapter.append(input, needed);
+        wrapper.nativeRateAdapter.process(
+            output, static_cast<std::size_t>(frames));
+    }
     if (!wrapper.vlRenderDiagnosticWritten) {
         float peak = 0.0f;
         for (std::size_t bus = 0; bus < vlOutputBusCount; ++bus) {
@@ -1253,7 +1390,7 @@ bool renderVl(WrapperState& wrapper, std::int32_t frames,
                 peak = std::max(peak, std::abs(samples[frame]));
         }
         if (peak > 0.0f) {
-            reportBridgeDiagnostic("render", frames, cachedPrefix, peak);
+            reportBridgeDiagnostic("render", frames, 0, peak);
             reportBusDiagnostic(wrapper, frames);
             wrapper.vlRenderDiagnosticWritten = true;
         }
@@ -1377,16 +1514,13 @@ vst2::IntPtr dispatch(vst2::AEffect* effect, std::int32_t opcode,
             configureVl(*wrapper, option);
         if (opcode == vst2::setBlockSize && value > 0) {
             try {
-                const auto quantum = static_cast<std::size_t>(
-                    hybrid::XgEffectsBridge::quantumFrames);
-                wrapper->vlOutputCapacityFrames =
-                    (static_cast<std::size_t>(value) + quantum - 1)
-                    / quantum * quantum;
-                wrapper->vlOutputBuses.assign(
-                    wrapper->vlOutputCapacityFrames * vlOutputBusCount, 0.0f);
+                configureAudioBuffers(*wrapper,
+                                      static_cast<std::size_t>(value));
             } catch (const std::exception& error) {
                 wrapper->vlOutputCapacityFrames = 0;
                 wrapper->vlOutputBuses.clear();
+                wrapper->nativeOutputCapacityFrames = 0;
+                wrapper->nativeOutputBuses.clear();
                 reportVlFailure("block buffer allocation failure", error.what());
             }
         }
@@ -1534,16 +1668,13 @@ extern "C" __declspec(dllexport) vst2::AEffect* VSTPluginMain(
     wrapperState->sgAvailable = std::filesystem::is_regular_file(sgVxdPath)
         && std::filesystem::is_regular_file(sgWorkerPath);
     try {
-        const auto quantum = static_cast<std::size_t>(
-            hybrid::XgEffectsBridge::quantumFrames);
-        wrapperState->vlOutputCapacityFrames =
-            (hybrid::NativeVlClient::maxFrames + quantum - 1)
-            / quantum * quantum;
-        wrapperState->vlOutputBuses.assign(
-            wrapperState->vlOutputCapacityFrames * vlOutputBusCount, 0.0f);
+        configureAudioBuffers(*wrapperState,
+                              hybrid::NativeVlClient::maxFrames);
     } catch (...) {
         wrapperState->vlOutputCapacityFrames = 0;
         wrapperState->vlOutputBuses.clear();
+        wrapperState->nativeOutputCapacityFrames = 0;
+        wrapperState->nativeOutputBuses.clear();
     }
     wchar_t disableEffects[2] {};
     const auto effectsDisabled = GetEnvironmentVariableW(

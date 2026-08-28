@@ -79,6 +79,15 @@ for diagnostic comparison with `SYXG100_VL_RENDER_PATH=transport`; it is not the
 default. SG uses its recovered 256-frame native host bridge. Render buffers,
 event queues, and IPC storage are fixed in size.
 
+VL and SG always run at their proven native rate of 44,100 Hz. At a different
+host rate, a preallocated streaming adapter converts all eight native dry and
+effect-send buses while retaining fractional position and unused source samples
+across callbacks. Absolute MIDI positions are converted onto the same native
+timeline, avoiding per-block rounding drift. The 44.1 kHz path bypasses the
+adapter and remains sample-identical to the accepted build. Complete VL and SG
+trace renders have also passed at 48 kHz. Real-time playback at 48 kHz has been
+confirmed in Foobar2000 without the former worker stall or crash.
+
 ## Runtime Layout
 
 Keep these files beside one another in one VST runtime directory:

@@ -22,8 +22,11 @@ so it can coexist with an original S-YXG50 entry.
 
 ## Current confidence
 
-Use a host sample rate of 44.1 kHz. Ordinary XG, legacy monophonic VL,
-assignment-defined multi-channel PVL, SG,
+Host rates of 44.1 and 48 kHz are supported. The 44.1 kHz path retains its
+accepted sample-identical output; complete VL and SG trace renders pass through
+the new 48 kHz streaming adapter. Live Foobar2000 playback at 48 kHz confirms
+that the former worker stall and crash are gone.
+Ordinary XG, legacy monophonic VL, assignment-defined multi-channel PVL, SG,
 native gain, reverb, and chorus have passed focused and real-time tests. Broader
 compatibility is not complete. Fast VL pitch bends pass real-time comparison
 after ordered RPN setup replay was corrected. Legacy VL songs without Yamaha
