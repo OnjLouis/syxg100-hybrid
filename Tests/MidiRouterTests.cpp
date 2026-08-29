@@ -40,6 +40,20 @@ int main()
     passed &= expect(!router.observeShortMessage(message(0x92, 67, 110)),
                      "other channels remain ordinary XG");
 
+    hybrid::MidiRouter lsbFirstRouter;
+    passed &= expect(
+        lsbFirstRouter.routeShortMessage(message(0xb0, 32, 1))
+            == hybrid::MidiDestination::both,
+        "QWS bank LSB reaches both engines before the bank MSB");
+    passed &= expect(
+        lsbFirstRouter.routeShortMessage(message(0xb0, 0, 33))
+            == hybrid::MidiDestination::both,
+        "QWS bank MSB keeps both engines synchronized");
+    passed &= expect(
+        lsbFirstRouter.routeShortMessage(message(0xc0, 71))
+            == hybrid::MidiDestination::vl,
+        "QWS program change uses the selected VL bank");
+
     passed &= expect(router.routeShortMessage(message(0xb1, 0, 0))
                          == hybrid::MidiDestination::both,
                      "leaving VL clears VL and reaches XG");

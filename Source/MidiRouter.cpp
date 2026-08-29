@@ -15,7 +15,6 @@ MidiDestination MidiRouter::routeShortMessage(std::uint32_t packedMessage)
     const auto operation = static_cast<std::uint8_t>(status & 0xf0);
     const auto data1 = static_cast<std::uint8_t>((packedMessage >> 8) & 0x7f);
     const auto data2 = static_cast<std::uint8_t>((packedMessage >> 16) & 0x7f);
-    const auto wasVl = isVlChannel(channel);
     const bool noteOn = operation == 0x90 && data2 != 0;
     const bool noteOff = operation == 0x80
         || (operation == 0x90 && data2 == 0);
@@ -69,7 +68,7 @@ MidiDestination MidiRouter::routeShortMessage(std::uint32_t packedMessage)
     }
 
     const auto isBankSelection = operation == 0xb0 && (data1 == 0 || data1 == 32);
-    if (isBankSelection && wasVl && !isVl)
+    if (isBankSelection)
         return MidiDestination::both;
     if (!isVl && (retainedNoteRelease || retainedSustainRelease
                   || retainedAllNotesOff)) {
