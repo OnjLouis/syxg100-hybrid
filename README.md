@@ -21,8 +21,9 @@ messages reset the remembered routing state.
 Channel 10 retains the normal rhythm default after a reset. In XG mode, a later
 bank MSB changes that implicit mode: melodic banks release channel 10 from
 rhythm operation, while bank 127 selects drums. GM1 and GS bank selections do
-not override their channel-10 drum default. GM2 follows its standard bank 120
-rhythm and bank 121 melodic selections. An explicit Yamaha part-mode SysEx
+not override their channel-10 drum default and retain the non-XG drum-note
+layout. GM2 follows its standard bank 120 rhythm and bank 121 melodic
+selections. An explicit Yamaha part-mode SysEx
 remains authoritative and is not overridden by subsequent bank changes.
 
 Note ownership is retained across bank changes in both directions. If a note,

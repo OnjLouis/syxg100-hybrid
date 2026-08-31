@@ -20,7 +20,7 @@ public:
     static constexpr std::size_t partCount = 16;
     static constexpr std::size_t defaultRhythmPart = 9;
     static constexpr std::uint8_t rhythmBankMsb = 127;
-    static constexpr std::uint8_t gm2RhythmBankMsb = 120;
+    static constexpr std::uint8_t compatibilityRhythmBankMsb = 120;
     static constexpr std::uint8_t gm2MelodicBankMsb = 121;
 
     XgPartModes() noexcept { reset(); }

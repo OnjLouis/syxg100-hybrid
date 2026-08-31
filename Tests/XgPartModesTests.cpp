@@ -56,6 +56,8 @@ int main()
         const auto gsStyleBankSelect = modes.selectBankMsb(9, 0);
         expect(!gsStyleBankSelect && modes.isRhythm(9),
                "GM and GS bank-zero setup keeps channel 10 in rhythm mode");
+        expect(modes.effectiveBankMsb(9, 0) == 120,
+               "GM and GS rhythm mode uses the compatibility drum layout");
     }
 
     constexpr std::array<std::uint8_t, 11> demoGsReset {
@@ -64,6 +66,8 @@ int main()
     modes.reset(hybrid::classifySystemReset(demoGsReset));
     expect(!modes.selectBankMsb(9, 0) && modes.isRhythm(9),
            "DEMO0002 GS Reset followed by bank zero keeps drums on channel 10");
+    expect(modes.effectiveBankMsb(9, 0) == 120,
+           "DEMO0002 GS Reset selects the non-XG drum layout");
 
     modes.reset(hybrid::MidiSystemReset::gm2);
     expect(!modes.selectBankMsb(9, 0) && modes.isRhythm(9),

@@ -55,7 +55,7 @@ std::optional<XgPartModeChange> XgPartModes::selectBankMsb(
     if (systemMode == MidiSystemReset::xg) {
         rhythm = bankMsb == rhythmBankMsb;
     } else if (systemMode == MidiSystemReset::gm2) {
-        if (bankMsb == gm2RhythmBankMsb)
+        if (bankMsb == compatibilityRhythmBankMsb)
             rhythm = true;
         else if (bankMsb != gm2MelodicBankMsb)
             return std::nullopt;
@@ -78,8 +78,14 @@ std::uint8_t XgPartModes::effectiveBankMsb(
 {
     if (!isRhythm(part))
         return selectedBankMsb;
-    return systemMode == MidiSystemReset::gm2
-        ? gm2RhythmBankMsb : rhythmBankMsb;
+    switch (systemMode) {
+    case MidiSystemReset::gm1:
+    case MidiSystemReset::gm2:
+    case MidiSystemReset::gs:
+        return compatibilityRhythmBankMsb;
+    default:
+        return rhythmBankMsb;
+    }
 }
 
 std::uint8_t XgPartModes::effectiveBankLsb(
