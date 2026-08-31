@@ -15,8 +15,8 @@ their legacy generated-code state cannot corrupt the host or one another.
 The wrapper keeps S-YXG50 as the proven AWM and effects engine. It routes MIDI
 bank MSBs 33, 81, and 97 to a native PVL engine and leaves ordinary XG parts on
 S-YXG50. Returning a channel from a VL bank to an ordinary bank clears the VL
-part and forwards the transition to XG. GM and XG System On messages reset the
-remembered routing state.
+part and forwards the transition to XG. GM1, GM2, GS, and XG system reset
+messages reset the remembered routing state.
 
 Note ownership is retained across bank changes in both directions. If a note,
 sustain pedal, or all-notes-off transaction begins under one engine and its

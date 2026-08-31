@@ -1,4 +1,5 @@
 #include "MidiRouter.h"
+#include "MidiSystemReset.h"
 #include "MidiChannelSnapshot.h"
 #include "NativeEventTimeline.h"
 #include "NativeSgClient.h"
@@ -783,16 +784,6 @@ void replaySgSetup(WrapperState& wrapper, std::uint64_t triggerFrame)
         wrapper.sg.timelineFrame = std::max(position, nativeTrigger);
 }
 
-bool isSystemReset(std::span<const std::uint8_t> bytes)
-{
-    const bool gmReset = bytes.size() >= 6 && bytes[0] == 0xf0
-        && bytes[1] == 0x7e && bytes[3] == 0x09 && bytes[4] == 0x01;
-    const bool xgReset = bytes.size() >= 9 && bytes[0] == 0xf0
-        && bytes[1] == 0x43 && bytes[3] == 0x4c && bytes[4] == 0x00
-        && bytes[5] == 0x00 && bytes[6] == 0x7e && bytes[7] == 0x00;
-    return gmReset || xgReset;
-}
-
 void queueVl(WrapperState& wrapper, VlVoiceState& voice,
              std::int32_t deltaFrames, std::uint32_t message)
 {
@@ -1042,7 +1033,8 @@ vst2::IntPtr processEvents(WrapperState& wrapper, const vst2::Events* events)
                     const auto eventFrame = wrapper.sgTimelineFrames
                         + static_cast<std::uint64_t>(
                             std::max(0, sysex->deltaFrames));
-                    const bool systemReset = isSystemReset(bytes);
+                    const bool systemReset = hybrid::classifySystemReset(bytes)
+                        != hybrid::MidiSystemReset::none;
                     if (systemReset) {
                         wrapper.router.reset();
                         resetVlPlaybackState(wrapper);

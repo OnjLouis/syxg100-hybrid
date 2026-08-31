@@ -53,9 +53,10 @@ the same ownership-safe routing, and the correction passed a live QWS test.
 
 When reporting a problem, include the host and version, sample rate, MIDI file,
 the approximate playback position, and whether the symptom affects ordinary
-XG, VL/PVL, SG, or an effect. Listen for missing or stuck notes, incorrect banks,
-timing changes, low level, missing tails, seek failures, and problems after
-switching repeatedly between songs.
+XG, VL/PVL, SG, or an effect. Listen for missing or stuck notes, incorrect
+banks, timing changes, low level, missing tails, stale controller state after
+GM1, GM2, GS, or XG reset messages, seek failures, and problems after switching
+repeatedly between songs.
 
 This private bundle includes Yamaha-derived runtime and demonstration files for
 compatibility testing. Do not republish those files without the necessary
