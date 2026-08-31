@@ -29,6 +29,8 @@ add_library(SYXG100Hybrid SHARED
     Source/VlPartRouter.h
     Source/XgEffectsBridge.cpp
     Source/XgEffectsBridge.h
+    Source/XgPartModes.cpp
+    Source/XgPartModes.h
     Source/HybridVst.cpp
     Source/Vst2Abi.h
     Source/exports.def
@@ -121,6 +123,17 @@ target_link_options(MidiSystemResetTests PRIVATE
     -static -static-libgcc -static-libstdc++
 )
 add_test(NAME MidiSystemResetTests COMMAND MidiSystemResetTests)
+
+add_executable(XgPartModesTests
+    Tests/XgPartModesTests.cpp
+    Source/XgPartModes.cpp
+    Source/XgPartModes.h
+)
+target_include_directories(XgPartModesTests PRIVATE Source)
+target_link_options(XgPartModesTests PRIVATE
+    -static -static-libgcc -static-libstdc++
+)
+add_test(NAME XgPartModesTests COMMAND XgPartModesTests)
 
 add_executable(LeImageLoaderTests
     Tests/LeImageLoaderTests.cpp

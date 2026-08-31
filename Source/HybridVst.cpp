@@ -11,6 +11,7 @@
 #include "VlVoiceAllocator.h"
 #include "Vst2Abi.h"
 #include "XgEffectsBridge.h"
+#include "XgPartModes.h"
 
 #include <windows.h>
 
@@ -41,6 +42,7 @@ constexpr std::size_t maxVlVoices = 8;
 // list. Keep dense setup bursts intact in one dispatcher call.
 constexpr std::size_t childEventsPerBatch = 4096;
 constexpr std::size_t maxChildEventBatches = 8;
+constexpr std::size_t maxSyntheticPartModeEvents = childEventsPerBatch;
 constexpr float int16Scale = 1.0f / 32768.0f;
 constexpr float defaultNativeOutputGain = 3.5f;
 constexpr float xgInternalBusScale = 32768.0f;
@@ -150,6 +152,7 @@ struct WrapperState {
     hybrid::VlVoiceAllocator<maxVlVoices> vlVoiceAllocator;
     SgState sg;
     hybrid::MidiRouter router;
+    hybrid::XgPartModes partModes;
     std::array<VlSetupEvent, maxVlSetupEvents> vlSetupEvents {};
     std::size_t vlSetupEventCount {};
     std::array<std::uint8_t, maxVlSetupSysexBytes> vlSetupSysex {};
@@ -163,6 +166,11 @@ struct WrapperState {
     std::uint64_t sgSetupBaseFrame {};
     std::array<ChildEventBatch, maxChildEventBatches> childBatches {};
     std::size_t childBatchCount {};
+    std::array<vst2::SysexEvent, maxSyntheticPartModeEvents>
+        syntheticPartModeEvents {};
+    std::array<std::array<std::uint8_t, 9>, maxSyntheticPartModeEvents>
+        syntheticPartModeData {};
+    std::size_t syntheticPartModeEventCount {};
     std::array<hybrid::ipc::TimedMidiEvent, maxPendingVlEvents>
         vlTimedMidiScratch {};
     std::vector<float> vlOutputBuses;
@@ -849,6 +857,28 @@ void retainChildEvent(WrapperState& wrapper, vst2::Event* event, bool forceNew)
     batch.events[batch.numEvents++] = event;
 }
 
+bool retainPartModeChange(WrapperState& wrapper,
+                          const hybrid::XgPartModeChange& change,
+                          std::int32_t deltaFrames, bool forceNew)
+{
+    if (wrapper.syntheticPartModeEventCount
+        == wrapper.syntheticPartModeEvents.size()) {
+        return false;
+    }
+    const auto index = wrapper.syntheticPartModeEventCount++;
+    auto& data = wrapper.syntheticPartModeData[index];
+    data = { 0xf0, 0x43, 0x10, 0x4c, 0x08,
+             static_cast<std::uint8_t>(change.part), 0x07,
+             static_cast<std::uint8_t>(change.rhythm ? 1 : 0), 0xf7 };
+    auto& event = wrapper.syntheticPartModeEvents[index];
+    event = {};
+    event.deltaFrames = deltaFrames;
+    event.dumpBytes = static_cast<std::int32_t>(data.size());
+    event.sysexDump = reinterpret_cast<char*>(data.data());
+    retainChildEvent(wrapper, reinterpret_cast<vst2::Event*>(&event), forceNew);
+    return true;
+}
+
 void clearChildEvents(WrapperState& wrapper)
 {
     for (std::size_t index = 0; index < wrapper.childBatchCount; ++index)
@@ -860,11 +890,7 @@ vst2::IntPtr processEvents(WrapperState& wrapper, const vst2::Events* events)
 {
     if (events == nullptr)
         return 0;
-    if (!wrapper.vlAvailable && !wrapper.sgAvailable) {
-        return wrapper.child->dispatcher(wrapper.child, vst2::processEvents, 0,
-                                         0, const_cast<vst2::Events*>(events),
-                                         0.0f);
-    }
+    wrapper.syntheticPartModeEventCount = 0;
     const auto firstNewBatch = wrapper.childBatchCount;
     bool firstChildEvent = true;
     vst2::IntPtr result = 0;
@@ -876,6 +902,21 @@ vst2::IntPtr processEvents(WrapperState& wrapper, const vst2::Events* events)
                 const auto* midi = reinterpret_cast<const vst2::MidiEvent*>(event);
                 const auto packed = packedMessage(*midi);
                 const auto channel = static_cast<std::uint8_t>(packed & 0x0f);
+                const auto operation = static_cast<std::uint8_t>(packed & 0xf0);
+                const auto controller = static_cast<std::uint8_t>(
+                    (packed >> 8) & 0x7f);
+                const auto value = static_cast<std::uint8_t>(
+                    (packed >> 16) & 0x7f);
+                if (operation == 0xb0 && controller == 0) {
+                    if (const auto change = wrapper.partModes.selectBankMsb(
+                            channel, value)) {
+                        if (retainPartModeChange(wrapper, *change,
+                                                 midi->deltaFrames,
+                                                 firstChildEvent)) {
+                            firstChildEvent = false;
+                        }
+                    }
+                }
                 const auto eventFrame = wrapper.sgTimelineFrames
                     + static_cast<std::uint64_t>(
                         std::max(0, midi->deltaFrames));
@@ -1037,11 +1078,13 @@ vst2::IntPtr processEvents(WrapperState& wrapper, const vst2::Events* events)
                         != hybrid::MidiSystemReset::none;
                     if (systemReset) {
                         wrapper.router.reset();
+                        wrapper.partModes.reset();
                         resetVlPlaybackState(wrapper);
                         clearVlSetup(wrapper);
                         if (wrapper.sg.client == nullptr)
                             clearSgSetup(wrapper);
                     }
+                    (void)wrapper.partModes.observe(bytes);
                     if (const auto assignment =
                             hybrid::vlVoiceAssignment(bytes)) {
                         const auto voiceIndex = assignment->voice;

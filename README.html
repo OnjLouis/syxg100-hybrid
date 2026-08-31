@@ -64,7 +64,10 @@
   preserves custom VL voice uploads instead of replacing them with a redundant
   program selection. Note, sustain-pedal, and all-notes-off ownership survives
   bank changes in either direction, preventing held XG or VL notes from being
-  stranded when a channel changes synthesis engine before release.</p>
+  stranded when a channel changes synthesis engine before release. Channel 10
+  still starts in the XG rhythm mode after reset, but an explicit melodic bank
+  selection now releases that implicit default instead of remaining forced to
+  drums. Explicit Yamaha part-mode SysEx continues to take priority.</p>
 
   <p>This remains preservation software rather than a bit-exact emulator. Fast
   VL pitch bends pass real-time comparison after the wrapper was corrected to

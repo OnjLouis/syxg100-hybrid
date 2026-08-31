@@ -18,6 +18,11 @@ S-YXG50. Returning a channel from a VL bank to an ordinary bank clears the VL
 part and forwards the transition to XG. GM1, GM2, GS, and XG system reset
 messages reset the remembered routing state.
 
+Channel 10 retains the normal XG rhythm default after a reset. A later bank
+MSB now changes that implicit mode: melodic banks release channel 10 from
+rhythm operation, while bank 127 selects drums. An explicit Yamaha part-mode
+SysEx remains authoritative and is not overridden by subsequent bank changes.
+
 Note ownership is retained across bank changes in both directions. If a note,
 sustain pedal, or all-notes-off transaction begins under one engine and its
 channel changes between XG and VL before release, the required release reaches
