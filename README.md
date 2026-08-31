@@ -95,7 +95,8 @@ confirmed in Foobar2000 without the former worker stall or crash.
 
 ## Runtime Layout
 
-Keep these files beside one another in one VST runtime directory:
+The packaged tester archive groups these files in its `VST` folder. Keep them
+beside one another in that one runtime directory:
 
 ```text
 syxg100-hybrid.dll       built by this project

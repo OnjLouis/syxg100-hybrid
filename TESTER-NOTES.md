@@ -16,9 +16,10 @@ Sxgpvknl.vxd
 sxgsgknl.vxd
 ```
 
-Keep the supplied VST and both worker executables in the same directory. Add
-`syxg100-hybrid.dll` to the host as **S-YXG100 Hybrid**. Its VST ID is `S1HY`,
-so it can coexist with an original S-YXG50 entry.
+The archive groups the VST, both workers, and Yamaha runtime files in its
+`VST` folder. Keep that folder intact. Add `syxg100-hybrid.dll` from there to
+the host as **S-YXG100 Hybrid**. Its VST ID is `S1HY`, so it can coexist with
+an original S-YXG50 entry.
 
 ## Current confidence
 
