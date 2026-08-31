@@ -126,6 +126,8 @@ add_test(NAME MidiSystemResetTests COMMAND MidiSystemResetTests)
 
 add_executable(XgPartModesTests
     Tests/XgPartModesTests.cpp
+    Source/MidiSystemReset.cpp
+    Source/MidiSystemReset.h
     Source/XgPartModes.cpp
     Source/XgPartModes.h
 )

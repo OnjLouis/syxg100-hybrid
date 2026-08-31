@@ -2,11 +2,13 @@
 
 namespace hybrid {
 
-void XgPartModes::reset() noexcept
+void XgPartModes::reset(MidiSystemReset system) noexcept
 {
     rhythmParts.fill(false);
     rhythmParts[defaultRhythmPart] = true;
     explicitPartModes.fill(false);
+    systemMode = system == MidiSystemReset::none
+        ? MidiSystemReset::xg : system;
 }
 
 std::optional<XgPartModeChange> XgPartModes::observe(
@@ -48,7 +50,18 @@ std::optional<XgPartModeChange> XgPartModes::selectBankMsb(
 {
     if (part >= partCount || explicitPartModes[part])
         return std::nullopt;
-    const bool rhythm = bankMsb == rhythmBankMsb;
+
+    bool rhythm = false;
+    if (systemMode == MidiSystemReset::xg) {
+        rhythm = bankMsb == rhythmBankMsb;
+    } else if (systemMode == MidiSystemReset::gm2) {
+        if (bankMsb == gm2RhythmBankMsb)
+            rhythm = true;
+        else if (bankMsb != gm2MelodicBankMsb)
+            return std::nullopt;
+    } else {
+        return std::nullopt;
+    }
     if (rhythmParts[part] == rhythm)
         return std::nullopt;
     rhythmParts[part] = rhythm;
@@ -63,7 +76,10 @@ bool XgPartModes::isRhythm(std::size_t part) const noexcept
 std::uint8_t XgPartModes::effectiveBankMsb(
     std::size_t part, std::uint8_t selectedBankMsb) const noexcept
 {
-    return isRhythm(part) ? rhythmBankMsb : selectedBankMsb;
+    if (!isRhythm(part))
+        return selectedBankMsb;
+    return systemMode == MidiSystemReset::gm2
+        ? gm2RhythmBankMsb : rhythmBankMsb;
 }
 
 std::uint8_t XgPartModes::effectiveBankLsb(

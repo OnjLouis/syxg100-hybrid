@@ -1074,11 +1074,10 @@ vst2::IntPtr processEvents(WrapperState& wrapper, const vst2::Events* events)
                     const auto eventFrame = wrapper.sgTimelineFrames
                         + static_cast<std::uint64_t>(
                             std::max(0, sysex->deltaFrames));
-                    const bool systemReset = hybrid::classifySystemReset(bytes)
-                        != hybrid::MidiSystemReset::none;
-                    if (systemReset) {
+                    const auto systemReset = hybrid::classifySystemReset(bytes);
+                    if (systemReset != hybrid::MidiSystemReset::none) {
                         wrapper.router.reset();
-                        wrapper.partModes.reset();
+                        wrapper.partModes.reset(systemReset);
                         resetVlPlaybackState(wrapper);
                         clearVlSetup(wrapper);
                         if (wrapper.sg.client == nullptr)

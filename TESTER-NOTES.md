@@ -49,9 +49,11 @@ live playback and transport re-entry test with no missing first note.
 The reverse XG-to-VL transition is also covered: a held XG note now receives
 its eventual note-off after entering VL. Sustain release and all-notes-off use
 the same ownership-safe routing, and the correction passed a live QWS test.
-Channel 10 keeps its normal rhythm default after reset, but explicit melodic
-bank selections are no longer forced through the drum bank. `Neptuns_sphere`
-is the regression reference for melodic channel-10 playback.
+Channel 10 keeps its normal rhythm default after reset. XG melodic bank
+selections are no longer forced through the drum bank, while GM1 and GS bank
+setup preserves channel-10 percussion and GM2 observes banks 120 and 121.
+`Neptuns_sphere` is the melodic XG regression reference; `DEMO0002.MID` from
+the SC-55 demos is the GS percussion regression reference.
 
 ## Useful reports
 
