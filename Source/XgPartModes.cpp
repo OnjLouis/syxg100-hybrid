@@ -55,7 +55,7 @@ std::optional<XgPartModeChange> XgPartModes::selectBankMsb(
     if (systemMode == MidiSystemReset::xg) {
         rhythm = bankMsb == rhythmBankMsb;
     } else if (systemMode == MidiSystemReset::gm2) {
-        if (bankMsb == compatibilityRhythmBankMsb)
+        if (bankMsb == gm2RhythmBankMsb)
             rhythm = true;
         else if (bankMsb != gm2MelodicBankMsb)
             return std::nullopt;
@@ -73,25 +73,31 @@ bool XgPartModes::isRhythm(std::size_t part) const noexcept
     return part < rhythmParts.size() && rhythmParts[part];
 }
 
+bool XgPartModes::requiresBaseEngineNoteRouting(std::size_t part) const noexcept
+{
+    return systemMode == MidiSystemReset::gs
+        || (systemMode == MidiSystemReset::gm1 && isRhythm(part));
+}
+
 std::uint8_t XgPartModes::effectiveBankMsb(
     std::size_t part, std::uint8_t selectedBankMsb) const noexcept
 {
     if (!isRhythm(part))
         return selectedBankMsb;
-    switch (systemMode) {
-    case MidiSystemReset::gm1:
-    case MidiSystemReset::gm2:
-    case MidiSystemReset::gs:
-        return compatibilityRhythmBankMsb;
-    default:
+    if (systemMode == MidiSystemReset::gm2)
+        return gm2RhythmBankMsb;
+    if (systemMode == MidiSystemReset::xg)
         return rhythmBankMsb;
-    }
+    return selectedBankMsb;
 }
 
 std::uint8_t XgPartModes::effectiveBankLsb(
     std::size_t part, std::uint8_t selectedBankLsb) const noexcept
 {
-    return isRhythm(part) ? 0 : selectedBankLsb;
+    if (!isRhythm(part))
+        return selectedBankLsb;
+    return systemMode == MidiSystemReset::xg
+        || systemMode == MidiSystemReset::gm2 ? 0 : selectedBankLsb;
 }
 
 } // namespace hybrid

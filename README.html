@@ -31,6 +31,11 @@
 <body>
 <main>
   <h1>S-YXG100 Hybrid</h1>
+  <h2>Version 0.1.1</h2>
+  <p>Fixes drum NRPN controls on additional MIDI channels by preserving Yamaha's
+  own drum-bank setup. All 15 submitted test files render identically to original
+  S-YXG50, while melodic playback on channel 10 remains supported. Includes the
+  signed updater for existing installations.</p>
 
   <p>S-YXG100 Hybrid is a recovered 32-bit VST2 instrument that combines
   the cleaner 4 MB S-YXG50 AWM engine with recovered Yamaha VL/PVL physical
@@ -67,9 +72,10 @@
   stranded when a channel changes synthesis engine before release. Channel 10
   starts in rhythm mode after reset. XG melodic banks release that implicit
   default and bank 127 restores drums; GM1 and GS bank selections preserve the
-  channel-10 drum default and non-XG drum-note layout; GM2 uses bank 120 for
-  rhythm and bank 121 for melodic operation. Explicit Yamaha part-mode SysEx
-  continues to take priority.</p>
+  channel-10 drum default, with their original bank, program, and drum-note
+  layout passed through to S-YXG50 unchanged. GM2 uses bank 120 for rhythm and
+  bank 121 for melodic operation. Explicit Yamaha part-mode SysEx continues to
+  take priority.</p>
 
   <p>This remains preservation software rather than a bit-exact emulator. Fast
   VL pitch bends pass real-time comparison after the wrapper was corrected to
@@ -105,7 +111,7 @@
 
   <h2>Runtime files</h2>
 
-  <p>In the packaged tester archive, these six files are grouped in the
+  <p>In the packaged tester archive, these seven files are grouped in the
   <code>VST</code> folder. Keep them together in that one directory:</p>
 
   <pre>syxg100-hybrid.dll
@@ -113,14 +119,34 @@ syxg100-vl-worker.exe
 syxg100-sg-worker.exe
 syxg50-engine.bin
 Sxgpvknl.vxd
-sxgsgknl.vxd</pre>
+sxgsgknl.vxd
+syxg100-hybrid.version.json</pre>
 
-  <p>The first three are produced by this project. The final three are original
-  Yamaha runtime files and are not distributed by this project. A tester must
+  <p>The first three files and the version marker are produced by this project.
+  The three Yamaha runtime files are not distributed by the source project. A tester must
   provide them from software they are entitled to use. Rename the compatible
   portable S-YXG50 VST to <code>syxg50-engine.bin</code>. Its contents remain a
   Windows DLL; the different extension prevents a host from listing this private
   child engine as a second selectable S-YXG50 VST.</p>
+
+  <h2>Updating</h2>
+
+  <p>Close Foobar2000, REAPER, VSTHost, and any other program using the synth,
+  then run <code>Update Yamaha Hybrids.cmd</code>. The updater can live beside
+  this product folder, inside it, or in a shared parent folder containing both
+  Yamaha hybrids. It searches no more than two folder levels and updates only
+  synths whose DLLs are already installed.</p>
+
+  <p>The updater checks stable GitHub releases, displays the release notes, and
+  asks before replacing anything. Signed metadata limits each release to the
+  known files for the detected product, and every downloaded file is checked
+  against its signed SHA-256 hash.</p>
+
+  <p>Before replacement, the current managed files are saved in one compressed
+  rollback ZIP outside all plug-in folders. Only the newest rollback is kept,
+  under <code>%LOCALAPPDATA%\Onj Research\Yamaha Hybrid Updater\syxg100-hybrid\backups</code>.
+  A failed replacement is restored automatically, and unrelated files are not
+  changed.</p>
 
   <h2>Where the synthesis data lives</h2>
 

@@ -1,5 +1,12 @@
 # S-YXG100 Hybrid
 
+## Version 0.1.1
+
+Corrects drum NRPN handling on additional MIDI channels by preserving Yamaha's
+own drum-bank setup instead of forcing generic rhythm mode. All 15 submitted
+test files render identically to original S-YXG50; melodic channel 10 remains
+supported. Includes the signed updater for existing installations.
+
 For the user-facing overview, runtime layout, current compatibility notes, and
 real-time host instructions, see [`README.html`](README.html).
 
@@ -21,9 +28,9 @@ messages reset the remembered routing state.
 Channel 10 retains the normal rhythm default after a reset. In XG mode, a later
 bank MSB changes that implicit mode: melodic banks release channel 10 from
 rhythm operation, while bank 127 selects drums. GM1 and GS bank selections do
-not override their channel-10 drum default and retain the non-XG drum-note
-layout. GM2 follows its standard bank 120 rhythm and bank 121 melodic
-selections. An explicit Yamaha part-mode SysEx
+not override their channel-10 drum default; their original bank, program, and
+drum-note layout pass through to S-YXG50 unchanged. GM2 follows its standard
+bank 120 rhythm and bank 121 melodic selections. An explicit Yamaha part-mode SysEx
 remains authoritative and is not overridden by subsequent bank changes.
 
 Note ownership is retained across bank changes in both directions. If a note,
@@ -113,10 +120,32 @@ syxg100-sg-worker.exe    built by this project
 syxg50-engine.bin        user-supplied S-YXG50 VST binary
 Sxgpvknl.vxd             user-supplied original PVL VxD
 sxgsgknl.vxd             user-supplied original SG VxD
+syxg100-hybrid.version.json  updater product/version marker
 ```
 
-Neither user-supplied Yamaha file belongs in this repository or a distributed
-source or binary package.
+The user-supplied Yamaha files do not belong in this repository or a
+distributed source or binary package.
+
+## Updater
+
+`Update Yamaha Hybrids.cmd` launches the shared PowerShell updater. The pair
+may be placed in this product folder or in a common parent containing both
+hybrids. It searches at most two folder levels, detects existing installations
+by their unique wrapper DLLs, and never installs a missing synth.
+
+Stable GitHub release metadata is signed with a product-specific RSA key. The
+manifest restricts replacement to an allowlist, identifies the exact product,
+and supplies SHA-256 hashes for the externally hosted runtime ZIP and every
+managed file. The updater stages and verifies the complete package before
+changing the live folder. It displays release notes and requires confirmation
+unless explicitly invoked for unattended installation.
+
+Before replacement, managed files are stored in one rollback ZIP beneath
+`%LOCALAPPDATA%\Onj Research\Yamaha Hybrid Updater\syxg100-hybrid\backups`.
+Only the newest rollback and two bounded logs are retained. Rollback DLLs are
+never left loose in a VST search path, unrelated files are preserved, and a
+partial replacement is restored automatically. Audio hosts must be closed so
+they do not lock the runtime files.
 
 ## Portability and macOS
 

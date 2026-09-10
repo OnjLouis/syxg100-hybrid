@@ -222,6 +222,44 @@ bool compareMelodicChannel10(const char* wrapperPath, const char* directPath)
     return wrapperHash == melodicReferenceHash;
 }
 
+bool compareDrumNrpn(const char* wrapperPath, const char* directPath,
+                     std::uint8_t channel)
+{
+    std::array<vst2::MidiEvent, 9> midi {};
+    EventBatch batch;
+    batch.numEvents = static_cast<std::int32_t>(midi.size());
+    for (std::size_t index = 0; index < midi.size(); ++index)
+        batch.events[index] = reinterpret_cast<vst2::Event*>(&midi[index]);
+    const auto cc = static_cast<std::uint8_t>(0xb0 | channel);
+    setMessage(midi[0], cc, 0, 127);
+    setMessage(midi[1], cc, 32, 0);
+    setMessage(midi[2], static_cast<std::uint8_t>(0xc0 | channel), 0, 0);
+    setMessage(midi[3], cc, 99, 24); // Drum level, addressed by note number.
+    setMessage(midi[4], cc, 98, 38);
+    setMessage(midi[5], cc, 6, 0);
+    setMessage(midi[6], static_cast<std::uint8_t>(0x90 | channel), 38, 100);
+    setMessage(midi[7], cc, 91, 0);
+    setMessage(midi[8], cc, 93, 0);
+    auto wrapper = openInstance(wrapperPath);
+    auto direct = openInstance(directPath);
+    if (!wrapper.effect || !direct.effect) {
+        closeInstance(wrapper);
+        closeInstance(direct);
+        return false;
+    }
+    sendSysex(wrapper, xgReset);
+    sendSysex(direct, xgReset);
+    const auto wrapperHash = render(wrapper, batch);
+    const auto directHash = render(direct, batch);
+    std::printf("drum-nrpn-channel-%u wrapper=%016llx direct=%016llx equal=%s\n",
+                channel + 1, static_cast<unsigned long long>(wrapperHash),
+                static_cast<unsigned long long>(directHash),
+                wrapperHash == directHash ? "yes" : "no");
+    closeInstance(wrapper);
+    closeInstance(direct);
+    return wrapperHash == directHash;
+}
+
 int main(int argc, char** argv)
 {
     if (argc != 3 && argc != 4) {
@@ -240,5 +278,9 @@ int main(int argc, char** argv)
             passed &= compareCount(argv[1], argv[2], count);
     }
     passed &= compareMelodicChannel10(argv[1], argv[2]);
+    if (!channel10Only) {
+        for (const auto channel : { 8u, 9u, 10u, 14u })
+            passed &= compareDrumNrpn(argv[1], argv[2], static_cast<std::uint8_t>(channel));
+    }
     return passed ? 0 : 1;
 }

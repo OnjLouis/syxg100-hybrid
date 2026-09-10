@@ -910,7 +910,9 @@ vst2::IntPtr processEvents(WrapperState& wrapper, const vst2::Events* events)
                 if (operation == 0xb0 && controller == 0) {
                     if (const auto change = wrapper.partModes.selectBankMsb(
                             channel, value)) {
-                        if (retainPartModeChange(wrapper, *change,
+                        // Yamaha selects its editable drum setup from the bank.
+                        // Forcing generic rhythm mode here disables drum NRPNs.
+                        if (!change->rhythm && retainPartModeChange(wrapper, *change,
                                                  midi->deltaFrames,
                                                  firstChildEvent)) {
                             firstChildEvent = false;

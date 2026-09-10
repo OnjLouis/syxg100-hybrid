@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.25)
 
-project(SYXG100Hybrid VERSION 0.1.0 LANGUAGES CXX)
+project(SYXG100Hybrid VERSION 0.1.1 LANGUAGES CXX)
 
 if(NOT WIN32 OR CMAKE_SIZEOF_VOID_P EQUAL 8)
     message(FATAL_ERROR "S-YXG100 Hybrid currently requires a 32-bit Windows target")

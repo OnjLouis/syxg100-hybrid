@@ -56,8 +56,17 @@ int main()
         const auto gsStyleBankSelect = modes.selectBankMsb(9, 0);
         expect(!gsStyleBankSelect && modes.isRhythm(9),
                "GM and GS bank-zero setup keeps channel 10 in rhythm mode");
-        expect(modes.effectiveBankMsb(9, 0) == 120,
-               "GM and GS rhythm mode uses the compatibility drum layout");
+        expect(modes.effectiveBankMsb(9, 0) == 0,
+               "GM and GS rhythm mode preserves bank zero");
+        expect(modes.effectiveBankMsb(9, 48) == 48,
+               "GM and GS rhythm mode preserves SC-88 drum banks");
+        expect(modes.effectiveBankLsb(9, 7) == 7,
+               "GM and GS rhythm mode preserves the selected bank LSB");
+        expect(modes.requiresBaseEngineNoteRouting(9),
+               "GM and GS rhythm mode remains on the base-engine path");
+        expect(modes.requiresBaseEngineNoteRouting(0)
+                   == (system == hybrid::MidiSystemReset::gs),
+               "GS defers all notes while GM keeps melodic 2006LE routing");
     }
 
     constexpr std::array<std::uint8_t, 11> demoGsReset {
@@ -66,8 +75,10 @@ int main()
     modes.reset(hybrid::classifySystemReset(demoGsReset));
     expect(!modes.selectBankMsb(9, 0) && modes.isRhythm(9),
            "DEMO0002 GS Reset followed by bank zero keeps drums on channel 10");
-    expect(modes.effectiveBankMsb(9, 0) == 120,
-           "DEMO0002 GS Reset selects the non-XG drum layout");
+    expect(modes.effectiveBankMsb(9, 0) == 0,
+           "DEMO0002 GS Reset preserves its original drum bank");
+    expect(modes.requiresBaseEngineNoteRouting(0),
+           "GS Reset leaves melodic GS interpretation to the base engine");
 
     modes.reset(hybrid::MidiSystemReset::gm2);
     expect(!modes.selectBankMsb(9, 0) && modes.isRhythm(9),
@@ -78,6 +89,8 @@ int main()
            "GM2 melodic bank releases channel 10 from rhythm mode");
     expect(modes.selectBankMsb(5, 120) && modes.isRhythm(5),
            "GM2 drum bank enables rhythm on another channel");
+    expect(!modes.requiresBaseEngineNoteRouting(5),
+           "GM2 rhythm bank remains eligible for 2006LE routing");
 
     modes.reset(hybrid::MidiSystemReset::xg);
     expect(modes.selectBankMsb(9, 0) && !modes.isRhythm(9),

@@ -31,6 +31,12 @@ int main()
     constexpr std::array<std::uint8_t, 11> gs {
         0xf0, 0x41, 0x10, 0x42, 0x12, 0x40, 0x00, 0x7f, 0x00, 0x41, 0xf7
     };
+    constexpr std::array<std::uint8_t, 11> sc88Mode1 {
+        0xf0, 0x41, 0x10, 0x42, 0x12, 0x00, 0x00, 0x7f, 0x00, 0x01, 0xf7
+    };
+    constexpr std::array<std::uint8_t, 11> sc88Mode2 {
+        0xf0, 0x41, 0x10, 0x42, 0x12, 0x00, 0x00, 0x7f, 0x01, 0x00, 0xf7
+    };
     constexpr std::array<std::uint8_t, 9> xg {
         0xf0, 0x43, 0x10, 0x4c, 0x00, 0x00, 0x7e, 0x00, 0xf7
     };
@@ -41,6 +47,10 @@ int main()
            "GM2 System On is recognized");
     expect(classifySystemReset(gs) == MidiSystemReset::gs,
            "GS Reset is recognized");
+    expect(classifySystemReset(sc88Mode1) == MidiSystemReset::gs,
+           "SC-88 MODE-1 System Mode Set is recognized");
+    expect(classifySystemReset(sc88Mode2) == MidiSystemReset::gs,
+           "SC-88 MODE-2 System Mode Set is recognized");
     expect(classifySystemReset(xg) == MidiSystemReset::xg,
            "XG System On is recognized");
 
@@ -65,6 +75,15 @@ int main()
     malformedGs[9] = 0;
     expect(classifySystemReset(malformedGs) == MidiSystemReset::none,
            "GS reset with bad checksum is rejected");
+    auto malformedSc88Mode = sc88Mode1;
+    malformedSc88Mode[9] = 0;
+    expect(classifySystemReset(malformedSc88Mode) == MidiSystemReset::none,
+           "SC-88 System Mode Set with bad checksum is rejected");
+    auto unsupportedSc88Mode = sc88Mode1;
+    unsupportedSc88Mode[8] = 2;
+    unsupportedSc88Mode[9] = 0x7f;
+    expect(classifySystemReset(unsupportedSc88Mode) == MidiSystemReset::none,
+           "unsupported SC-88 system mode is rejected");
     auto malformedXg = xg;
     malformedXg[2] = 0x20;
     expect(classifySystemReset(malformedXg) == MidiSystemReset::none,
