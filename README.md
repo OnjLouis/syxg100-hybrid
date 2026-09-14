@@ -126,6 +126,27 @@ syxg100-hybrid.version.json  updater product/version marker
 The user-supplied Yamaha files do not belong in this repository or a
 distributed source or binary package.
 
+## Wine compatibility
+
+The 32-bit plug-in and its separate native VL/SG workers can run under Wine,
+but the workers require Wine's newer WoW64 process arrangement. A user reported
+that an incompatible prefix let ordinary XG play while the VL worker faulted
+as soon as a VL note sounded, causing the part to fall back to piano. For Wine
+11, use a 64-bit prefix and force the newer WoW64 mode when launching the
+32-bit VST host, for example:
+
+```sh
+WINEPREFIX="$HOME/.wine-syxg" WINEARCH=win64 wineboot
+WINEPREFIX="$HOME/.wine-syxg" WINEARCH=wow64 wine /path/to/vst-host.exe
+```
+
+`WINEARCH=wow64` requires a prefix that was created as 64-bit, which is Wine's
+default. It cannot convert a pure `WINEARCH=win32` prefix; create a separate
+64-bit prefix instead. This workaround was reported in
+[issue 4](https://github.com/OnjLouis/syxg100-hybrid/issues/4) and agrees with
+[Wine 11's documented new-WoW64 behaviour](https://list.winehq.org/hyperkitty/list/wine-releases%40list.winehq.org/thread/UL6L2GJ55VYUJ5KUMBZ3TZSXRFJ52QG6/).
+Wine remains community-tested rather than a primary supported platform.
+
 ## Updater
 
 `Update Yamaha Hybrids.cmd` launches the shared PowerShell updater. The pair

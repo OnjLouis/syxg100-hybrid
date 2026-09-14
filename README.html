@@ -129,6 +129,28 @@ syxg100-hybrid.version.json</pre>
   Windows DLL; the different extension prevents a host from listing this private
   child engine as a second selectable S-YXG50 VST.</p>
 
+  <h2>Wine compatibility</h2>
+
+  <p>The 32-bit plug-in and its separate native VL/SG workers can run under
+  Wine, but the workers require Wine's newer WoW64 process arrangement. A user
+  reported that an incompatible prefix let ordinary XG play while the VL worker
+  faulted as soon as a VL note sounded, causing the part to fall back to piano.
+  For Wine 11, use a 64-bit prefix and force the newer WoW64 mode when launching
+  the 32-bit VST host:</p>
+
+  <pre>WINEPREFIX="$HOME/.wine-syxg" WINEARCH=win64 wineboot
+WINEPREFIX="$HOME/.wine-syxg" WINEARCH=wow64 wine /path/to/vst-host.exe</pre>
+
+  <p><code>WINEARCH=wow64</code> requires a prefix that was created as 64-bit,
+  which is Wine's default. It cannot convert a pure
+  <code>WINEARCH=win32</code> prefix; create a separate 64-bit prefix instead.
+  This workaround was reported in
+  <a href="https://github.com/OnjLouis/syxg100-hybrid/issues/4">issue 4</a>
+  and agrees with
+  <a href="https://list.winehq.org/hyperkitty/list/wine-releases%40list.winehq.org/thread/UL6L2GJ55VYUJ5KUMBZ3TZSXRFJ52QG6/">Wine
+  11's documented new-WoW64 behaviour</a>. Wine remains community-tested
+  rather than a primary supported platform.</p>
+
   <h2>Updating</h2>
 
   <p>Close Foobar2000, REAPER, VSTHost, and any other program using the synth,
