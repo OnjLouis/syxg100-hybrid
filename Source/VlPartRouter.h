@@ -32,6 +32,8 @@ struct VlVoiceAssignment {
     std::span<const std::uint8_t> bytes, std::uint8_t sourceChannel);
 [[nodiscard]] std::optional<VlVoiceAssignment> vlVoiceAssignment(
     std::span<const std::uint8_t> bytes);
+[[nodiscard]] bool isVlNativeBulkDump(
+    std::span<const std::uint8_t> bytes) noexcept;
 void applyVlSysexRoute(std::span<std::uint8_t> bytes, VlSysexRoute route);
 void applyVlSysexRoute(std::span<std::uint8_t> bytes, VlSysexRoute route,
                        std::uint8_t nativeChannel);

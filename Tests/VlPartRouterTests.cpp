@@ -41,6 +41,17 @@ int main()
     assert(assignment->channel == 1);
     assert(!hybrid::vlVoiceAssignment(globalReset).has_value());
 
+    const std::array<std::uint8_t, 10> nativeBulk {
+        0xf0, 0x43, 0x00, 0x64, 0x00, 0x00, 0x0e, 0x1f, 0x00, 0xf7
+    };
+    assert(hybrid::isVlNativeBulkDump(nativeBulk));
+    auto otherModel = nativeBulk;
+    otherModel[3] = 0x4c;
+    assert(!hybrid::isVlNativeBulkDump(otherModel));
+    auto parameterChange = nativeBulk;
+    parameterChange[2] = 0x10;
+    assert(!hybrid::isVlNativeBulkDump(parameterChange));
+
     auto remappedVoiceAssignment = sourceVoiceAssignment;
     hybrid::applyVlSysexRoute(remappedVoiceAssignment,
                               VlSysexRoute::remapVoiceAssignment);

@@ -19,6 +19,20 @@ a modern Windows VST2 host while retaining S-YXG50 for ordinary XG synthesis
 and Yamaha effects. The recovered engines run as isolated worker processes so
 their legacy generated-code state cannot corrupt the host or one another.
 
+## Accessible editor
+
+The plug-in editor opens a native Windows dashboard with three pages: live
+status, under-the-hood routing, and the original Yamaha editor. Status uses
+standard named controls and a 16-channel report list that exposes engine,
+bank, program, note activity, controllers, pitch bend, and effect sends to
+screen readers. Its small engine activity graphic is supplemental; the same values
+are always present in the selected-channel text.
+
+Use `Alt+S`, `Alt+U`, or `Alt+Y` for the three pages, `F5` or `Alt+R` to
+refresh, and `Alt+C` to copy a complete text report. Tab and Shift+Tab move
+through the controls, and arrow keys switch among the page buttons. Live
+updates change rows in place without rebuilding the list or moving focus.
+
 The wrapper keeps S-YXG50 as the proven AWM and effects engine. It routes MIDI
 bank MSBs 33, 81, and 97 to a native PVL engine and leaves ordinary XG parts on
 S-YXG50. Returning a channel from a VL bank to an ordinary bank clears the VL

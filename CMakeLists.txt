@@ -11,6 +11,10 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 add_library(SYXG100Hybrid SHARED
+    Source/HybridEditor.cpp
+    Source/HybridEditor.h
+    Source/HybridStatus.cpp
+    Source/HybridStatus.h
     Source/MidiRouter.cpp
     Source/MidiRouter.h
     Source/MidiSystemReset.cpp
@@ -39,7 +43,12 @@ set_target_properties(SYXG100Hybrid PROPERTIES
     OUTPUT_NAME "syxg100-hybrid"
     PREFIX ""
 )
-target_compile_definitions(SYXG100Hybrid PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX)
+target_compile_definitions(SYXG100Hybrid PRIVATE
+    WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE
+)
+target_link_libraries(SYXG100Hybrid PRIVATE
+    comctl32 user32 gdi32 oleacc ole32 uuid
+)
 target_link_options(SYXG100Hybrid PRIVATE -static -static-libgcc -static-libstdc++)
 
 add_executable(SYXG100VlWorker
@@ -101,6 +110,19 @@ target_compile_definitions(HybridDualInstanceProbe PRIVATE
 )
 target_link_options(HybridDualInstanceProbe PRIVATE
     -static -static-libgcc -static-libstdc++
+)
+
+add_executable(HybridEditorHostProbe
+    Tests/HybridEditorHostProbe.cpp
+    Source/Vst2Abi.h
+)
+target_include_directories(HybridEditorHostProbe PRIVATE Source)
+target_compile_definitions(HybridEditorHostProbe PRIVATE
+    WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE
+)
+target_link_libraries(HybridEditorHostProbe PRIVATE comctl32 user32 gdi32)
+target_link_options(HybridEditorHostProbe PRIVATE
+    -municode -static -static-libgcc -static-libstdc++
 )
 
 enable_testing()
@@ -228,3 +250,36 @@ target_link_options(StreamingRateAdapterTests PRIVATE
     -static -static-libgcc -static-libstdc++
 )
 add_test(NAME StreamingRateAdapterTests COMMAND StreamingRateAdapterTests)
+
+add_executable(HybridStatusTests
+    Tests/HybridStatusTests.cpp
+    Source/HybridStatus.cpp
+    Source/HybridStatus.h
+)
+target_include_directories(HybridStatusTests PRIVATE Source)
+target_link_options(HybridStatusTests PRIVATE
+    -static -static-libgcc -static-libstdc++
+)
+add_test(NAME HybridStatusTests COMMAND HybridStatusTests)
+
+add_executable(HybridEditorTests
+    Tests/HybridEditorTests.cpp
+    Source/HybridEditor.cpp
+    Source/HybridEditor.h
+    Source/HybridStatus.cpp
+    Source/HybridStatus.h
+    Source/Vst2Abi.h
+)
+target_include_directories(HybridEditorTests PRIVATE Source)
+target_compile_definitions(HybridEditorTests PRIVATE
+    WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE
+)
+target_link_libraries(HybridEditorTests PRIVATE
+    comctl32 user32 gdi32 oleacc oleaut32 uuid
+)
+target_link_options(HybridEditorTests PRIVATE
+    -static -static-libgcc -static-libstdc++
+)
+add_test(NAME HybridEditorTests COMMAND HybridEditorTests)
+target_compile_options(HybridStatusTests PRIVATE -UNDEBUG)
+target_compile_options(HybridEditorTests PRIVATE -UNDEBUG)

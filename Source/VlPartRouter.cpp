@@ -48,6 +48,13 @@ std::optional<VlVoiceAssignment> vlVoiceAssignment(
     return VlVoiceAssignment { bytes[6], bytes[7] };
 }
 
+bool isVlNativeBulkDump(std::span<const std::uint8_t> bytes) noexcept
+{
+    return bytes.size() >= 10 && bytes.front() == 0xf0
+        && bytes[1] == 0x43 && (bytes[2] & 0xf0) == 0
+        && bytes[3] == 0x64 && bytes.back() == 0xf7;
+}
+
 void applyVlSysexRoute(std::span<std::uint8_t> bytes, VlSysexRoute route)
 {
     applyVlSysexRoute(bytes, route, canonicalVlChannel);

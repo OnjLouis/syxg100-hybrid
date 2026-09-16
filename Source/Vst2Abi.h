@@ -80,6 +80,13 @@ struct Events {
     Event* events[2] {};
 };
 
+struct ERect {
+    std::int16_t top {};
+    std::int16_t left {};
+    std::int16_t bottom {};
+    std::int16_t right {};
+};
+
 using EntryPoint = AEffect* (*)(HostCallback);
 
 constexpr std::int32_t effectMagic = 0x56737450;
@@ -90,12 +97,18 @@ enum EffectOpcode : std::int32_t {
     setSampleRate = 10,
     setBlockSize = 11,
     mainsChanged = 12,
+    editGetRect = 13,
+    editOpen = 14,
+    editClose = 15,
+    editIdle = 19,
     processEvents = 25,
     getEffectName = 45,
     getVendorString = 47,
     getProductString = 48,
     getVendorVersion = 49,
 };
+
+constexpr std::int32_t hasEditorFlag = 1 << 0;
 
 enum HostOpcode : std::int32_t {
     hostVersion = 1,

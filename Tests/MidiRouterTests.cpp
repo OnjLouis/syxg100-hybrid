@@ -166,5 +166,23 @@ int main()
         xgToVlAllNotesOffRouter.routeShortMessage(message(0x80, 67, 0))
             == hybrid::MidiDestination::vl,
         "all-notes-off removes retained XG releases");
+
+    hybrid::MidiRouter nativeBulkRouter;
+    passed &= expect(nativeBulkRouter.selectVlChannel(0),
+                     "first native VL bulk selection changes routing");
+    passed &= expect(!nativeBulkRouter.selectVlChannel(0),
+                     "repeated native VL bulk selection preserves routing");
+    passed &= expect(nativeBulkRouter.isVlChannel(0),
+                     "native VL bulk data selects channel 1");
+    passed &= expect(
+        nativeBulkRouter.routeShortMessage(message(0x90, 60, 100))
+            == hybrid::MidiDestination::vl,
+        "selected native VL channel routes notes to VL");
+    passed &= expect(
+        nativeBulkRouter.routeShortMessage(message(0xb0, 0, 0))
+            == hybrid::MidiDestination::both,
+        "a later bank selection reaches both engines");
+    passed &= expect(!nativeBulkRouter.isVlChannel(0),
+                     "a later ordinary bank selection clears native VL routing");
     return passed ? 0 : 1;
 }

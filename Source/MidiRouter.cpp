@@ -91,6 +91,16 @@ bool MidiRouter::isVlChannel(std::uint8_t channel) const
     return channel < bankMsb.size() && isVlBank(bankMsb[channel]);
 }
 
+bool MidiRouter::selectVlChannel(std::uint8_t channel) noexcept
+{
+    if (channel >= bankMsb.size())
+        return false;
+    const bool changed = !isVlBank(bankMsb[channel]);
+    bankMsb[channel] = 33;
+    bankLsb[channel] = 0;
+    return changed;
+}
+
 void MidiRouter::reset()
 {
     bankMsb.fill(0);
