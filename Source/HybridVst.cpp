@@ -10,6 +10,7 @@
 #include "SgRouting.h"
 #include "StreamingRateAdapter.h"
 #include "VlPartRouter.h"
+#include "VlPluginVoiceBulk.h"
 #include "VlVoiceAllocator.h"
 #include "Vst2Abi.h"
 #include "XgEffectsBridge.h"
@@ -180,6 +181,7 @@ struct WrapperState {
     std::array<hybrid::MidiChannelSnapshot, midiChannelCount>
         vlChannelSnapshots;
     hybrid::VlVoiceAllocator<maxVlVoices> vlVoiceAllocator;
+    hybrid::VlPluginVoiceBulk vlPluginVoiceBulk;
     SgState sg;
     hybrid::MidiRouter router;
     hybrid::XgPartModes partModes;
@@ -710,6 +712,35 @@ void activateNativeVlBulkChannel(WrapperState& wrapper)
     }
 }
 
+std::array<std::uint32_t, 15> pluginVoiceMessages(
+    const hybrid::VlPluginVoice& voice, std::uint8_t channel)
+{
+    const auto control = [channel](std::uint8_t number,
+                                   std::uint8_t value) {
+        return 0xb0u | channel
+            | (static_cast<std::uint32_t>(number) << 8)
+            | (static_cast<std::uint32_t>(value) << 16);
+    };
+    return {
+        control(0, voice.bankMsb),
+        control(32, voice.bankLsb),
+        0xc0u | channel
+            | (static_cast<std::uint32_t>(voice.program) << 8),
+        control(7, voice.volume),
+        control(voice.monoPoly == 0 ? 126 : 127, 0),
+        control(101, 0),
+        control(100, 0),
+        control(6, voice.pitchBendRange),
+        control(38, 0),
+        control(101, 127),
+        control(100, 127),
+        control(65, voice.portamentoSwitch == 0 ? 0 : 127),
+        control(5, voice.portamentoTime),
+        control(91, voice.reverbSend),
+        control(93, voice.chorusSend),
+    };
+}
+
 bool retainSgShort(WrapperState& wrapper, std::uint32_t message,
                    std::uint64_t absoluteFrame)
 {
@@ -867,6 +898,36 @@ void queueVl(WrapperState& wrapper, VlVoiceState& voice,
     };
     if (!hybrid::queueNativeMidi(voice.pending, voice.pendingCount, event))
         throw std::runtime_error("native VL event queue is full");
+}
+
+void applyPluginVoice(WrapperState& wrapper,
+                      const hybrid::VlPluginVoice& pluginVoice,
+                      std::int32_t deltaFrames)
+{
+    constexpr std::uint8_t channel = 0;
+    (void)wrapper.router.selectVlChannel(channel);
+    const auto messages = pluginVoiceMessages(pluginVoice, channel);
+    for (const auto message : messages) {
+        (void)wrapper.router.routeShortMessage(message);
+        wrapper.vlChannelSnapshots[channel].observe(message);
+        wrapper.status.observeShortMessage(message, true, false);
+        if (!wrapper.vlSetupHistoryFrozen
+            && !retainVlShort(wrapper, channel, message)) {
+            wrapper.vlSetupHistoryFrozen = true;
+        }
+        for (std::uint8_t voiceIndex = 0;
+             voiceIndex < wrapper.vlVoices.size(); ++voiceIndex) {
+            auto& voice = wrapper.vlVoices[voiceIndex];
+            if (!voice.started
+                || wrapper.vlVoiceAllocator.channel(voiceIndex) != channel) {
+                continue;
+            }
+            const auto nativeChannel = hybrid::nativeVlChannel(
+                wrapper.vlVoiceAllocator.hasExplicitConfiguration(), channel);
+            queueVl(wrapper, voice, deltaFrames,
+                    hybrid::remapVlShortMessage(message, nativeChannel));
+        }
+    }
 }
 
 void queueSgShort(WrapperState& wrapper, std::int32_t deltaFrames,
@@ -1146,10 +1207,17 @@ vst2::IntPtr processEvents(WrapperState& wrapper, const vst2::Events* events)
                         reinterpret_cast<const std::uint8_t*>(sysex->sysexDump),
                         static_cast<std::size_t>(sysex->dumpBytes),
                     };
-                    if (hybrid::isVlNativeBulkDump(bytes)
+                    const bool pluginVoiceBulk =
+                        hybrid::VlPluginVoiceBulk::isModel64Bulk(bytes);
+                    const auto pluginVoice =
+                        wrapper.vlPluginVoiceBulk.observe(bytes);
+                    if (pluginVoiceBulk
                         && wrapper.router.selectVlChannel(0)) {
                         activateNativeVlBulkChannel(wrapper);
                     }
+                    if (pluginVoice)
+                        applyPluginVoice(wrapper, *pluginVoice,
+                                         sysex->deltaFrames);
                     const auto eventFrame = wrapper.sgTimelineFrames
                         + static_cast<std::uint64_t>(
                             std::max(0, sysex->deltaFrames));
@@ -1213,6 +1281,8 @@ vst2::IntPtr processEvents(WrapperState& wrapper, const vst2::Events* events)
                             || channel
                                 == decltype(wrapper.vlVoiceAllocator)::unassignedChannel)
                             continue;
+                        if (pluginVoiceBulk)
+                            continue;
                         try {
                             const auto nativeChannel =
                                 hybrid::nativeVlChannel(
@@ -1231,7 +1301,8 @@ vst2::IntPtr processEvents(WrapperState& wrapper, const vst2::Events* events)
                                            "SysEx processing failure");
                         }
                     }
-                    if (!retainVlSysex(wrapper, bytes)) {
+                    if (!pluginVoiceBulk
+                        && !retainVlSysex(wrapper, bytes)) {
                         wrapper.vlSetupHistoryFrozen = true;
                     }
                 }

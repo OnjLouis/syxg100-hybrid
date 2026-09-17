@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.25)
 
-project(SYXG100Hybrid VERSION 0.1.1 LANGUAGES CXX)
+project(SYXG100Hybrid VERSION 0.1.2 LANGUAGES CXX)
 
 if(NOT WIN32 OR CMAKE_SIZEOF_VOID_P EQUAL 8)
     message(FATAL_ERROR "S-YXG100 Hybrid currently requires a 32-bit Windows target")
@@ -31,6 +31,7 @@ add_library(SYXG100Hybrid SHARED
     Source/StreamingRateAdapter.h
     Source/VlPartRouter.cpp
     Source/VlPartRouter.h
+    Source/VlPluginVoiceBulk.h
     Source/XgEffectsBridge.cpp
     Source/XgEffectsBridge.h
     Source/XgPartModes.cpp
@@ -178,6 +179,17 @@ target_link_options(VlPartRouterTests PRIVATE
     -static -static-libgcc -static-libstdc++
 )
 add_test(NAME VlPartRouterTests COMMAND VlPartRouterTests)
+
+add_executable(VlPluginVoiceBulkTests
+    Tests/VlPluginVoiceBulkTests.cpp
+    Source/VlPluginVoiceBulk.h
+)
+target_include_directories(VlPluginVoiceBulkTests PRIVATE Source)
+target_link_options(VlPluginVoiceBulkTests PRIVATE
+    -static -static-libgcc -static-libstdc++
+)
+target_compile_options(VlPluginVoiceBulkTests PRIVATE -UNDEBUG)
+add_test(NAME VlPluginVoiceBulkTests COMMAND VlPluginVoiceBulkTests)
 
 add_executable(SgRoutingTests
     Tests/SgRoutingTests.cpp

@@ -55,6 +55,13 @@ setup preserves channel-10 percussion and GM2 observes banks 120 and 121.
 `Neptuns_sphere` is the melodic XG regression reference; `DEMO0002.MID` from
 the SC-55 demos is the GS percussion regression reference.
 
+Yamaha model `0x64` Plug-in Voice bulk transactions are assembled and applied
+at their transaction footer. The retained regression song changes through all
+26 embedded voices during one playback pass. VSTHost also confirms that the
+accessible status page follows the selected VL bank and program. Foobar2000
+MIDI Player can render ahead and open the editor against a separate idle
+instance, so its status page is not a reliable live-playback probe.
+
 ## Useful reports
 
 When reporting a problem, include the host and version, sample rate, MIDI file,

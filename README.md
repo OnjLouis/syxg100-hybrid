@@ -1,11 +1,11 @@
 # S-YXG100 Hybrid
 
-## Version 0.1.1
+## Version 0.1.2
 
-Corrects drum NRPN handling on additional MIDI channels by preserving Yamaha's
-own drum-bank setup instead of forcing generic rhythm mode. All 15 submitted
-test files render identically to original S-YXG50; melodic channel 10 remains
-supported. Includes the signed updater for existing installations.
+Adds an accessible native editor and handles complete Yamaha model `0x64`
+Plug-in Voice bulk transactions. Songs can now load and change their embedded
+VL voices during playback, including the associated bank, program, volume,
+mono/poly, pitch-bend range, portamento, reverb, and chorus settings.
 
 For the user-facing overview, runtime layout, current compatibility notes, and
 real-time host instructions, see [`README.html`](README.html).
@@ -32,6 +32,12 @@ Use `Alt+S`, `Alt+U`, or `Alt+Y` for the three pages, `F5` or `Alt+R` to
 refresh, and `Alt+C` to copy a complete text report. Tab and Shift+Tab move
 through the controls, and arrow keys switch among the page buttons. Live
 updates change rows in place without rebuilding the list or moving focus.
+
+The status page describes the live plug-in instance owned by its host. VSTHost
+therefore exposes current channel activity. Foobar2000 MIDI Player may render a
+MIDI file ahead of playback and later open the editor on a new, idle instance;
+in that host the status page can consequently show defaults while Foobar2000 is
+playing its already-rendered audio.
 
 The wrapper keeps S-YXG50 as the proven AWM and effects engine. It routes MIDI
 bank MSBs 33, 81, and 97 to a native PVL engine and leaves ordinary XG parts on

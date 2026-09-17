@@ -31,11 +31,12 @@
 <body>
 <main>
   <h1>S-YXG100 Hybrid</h1>
-  <h2>Version 0.1.1</h2>
-  <p>Fixes drum NRPN controls on additional MIDI channels by preserving Yamaha's
-  own drum-bank setup. All 15 submitted test files render identically to original
-  S-YXG50, while melodic playback on channel 10 remains supported. Includes the
-  signed updater for existing installations.</p>
+  <h2>Version 0.1.2</h2>
+  <p>Adds an accessible native editor and handles complete Yamaha model
+  <code>0x64</code> Plug-in Voice bulk transactions. Songs can now load and
+  change their embedded VL voices during playback, including the associated
+  bank, program, volume, mono/poly, pitch-bend range, portamento, reverb, and
+  chorus settings.</p>
 
   <p>S-YXG100 Hybrid is a recovered 32-bit VST2 instrument that combines
   the cleaner 4 MB S-YXG50 AWM engine with recovered Yamaha VL/PVL physical
@@ -98,6 +99,12 @@
   copy a complete text report. Tab and Shift+Tab move through the controls,
   and arrow keys switch among the page buttons. Live updates change rows in
   place without rebuilding the list or moving focus.</p>
+
+  <p>The status page describes the live plug-in instance owned by its host.
+  VSTHost therefore exposes current channel activity. Foobar2000 MIDI Player
+  may render a MIDI file ahead of playback and later open the editor on a new,
+  idle instance; in that host the status page can consequently show defaults
+  even while Foobar2000 is playing its already-rendered audio.</p>
 
   <div class="important">
     <p><strong>Host rates of 44.1 and 48 kHz are supported.</strong> The recovered
