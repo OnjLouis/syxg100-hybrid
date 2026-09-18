@@ -6,6 +6,7 @@
 #include "NativeEventTimeline.h"
 #include "NativeSgClient.h"
 #include "NativeVlClient.h"
+#include "NativeWorkerPreloader.h"
 #include "OrderedSetupHistory.h"
 #include "SgRouting.h"
 #include "StreamingRateAdapter.h"
@@ -177,6 +178,7 @@ struct WrapperState {
     std::filesystem::path workerPath;
     std::filesystem::path sgVxdPath;
     std::filesystem::path sgWorkerPath;
+    std::unique_ptr<hybrid::NativeWorkerPreloader> workerPreloader;
     std::array<VlVoiceState, maxVlVoices> vlVoices;
     std::array<hybrid::MidiChannelSnapshot, midiChannelCount>
         vlChannelSnapshots;
@@ -538,8 +540,16 @@ hybrid::NativeVlClient* ensureVlVoice(WrapperState& wrapper,
     if (state.client != nullptr)
         return state.client.get();
     try {
-        state.client = std::make_unique<hybrid::NativeVlClient>(
-            wrapper.workerPath, wrapper.vxdPath, nativeSampleRate);
+        if (wrapper.workerPreloader != nullptr) {
+            auto preloaded = wrapper.workerPreloader->takeVl(voice);
+            if (!preloaded.failure.empty())
+                throw std::runtime_error(preloaded.failure);
+            state.client = std::move(preloaded.client);
+        }
+        if (state.client == nullptr) {
+            state.client = std::make_unique<hybrid::NativeVlClient>(
+                wrapper.workerPath, wrapper.vxdPath, nativeSampleRate);
+        }
         wrapper.status.setVlWorkerState(
             voice, hybrid::WorkerDisplayState::loaded);
         return state.client.get();
@@ -558,8 +568,16 @@ hybrid::NativeSgClient* ensureSg(WrapperState& wrapper)
     if (wrapper.sg.client != nullptr)
         return wrapper.sg.client.get();
     try {
-        wrapper.sg.client = std::make_unique<hybrid::NativeSgClient>(
-            wrapper.sgWorkerPath, wrapper.sgVxdPath, nativeSampleRate);
+        if (wrapper.workerPreloader != nullptr) {
+            auto preloaded = wrapper.workerPreloader->takeSg();
+            if (!preloaded.failure.empty())
+                throw std::runtime_error(preloaded.failure);
+            wrapper.sg.client = std::move(preloaded.client);
+        }
+        if (wrapper.sg.client == nullptr) {
+            wrapper.sg.client = std::make_unique<hybrid::NativeSgClient>(
+                wrapper.sgWorkerPath, wrapper.sgVxdPath, nativeSampleRate);
+        }
         wrapper.sg.started = true;
         wrapper.status.setSgState(true, false);
         return wrapper.sg.client.get();
@@ -1706,6 +1724,10 @@ vst2::IntPtr dispatch(vst2::AEffect* effect, std::int32_t opcode,
     if (opcode == vst2::processEvents)
         return processEvents(*wrapper, static_cast<const vst2::Events*>(data));
     if (opcode != vst2::close) {
+        if (opcode == vst2::mainsChanged && value != 0
+            && wrapper->workerPreloader != nullptr) {
+            wrapper->workerPreloader->start();
+        }
         const auto result = wrapper->child->dispatcher(
             wrapper->child, opcode, index, value, data, option);
         if (opcode == vst2::setSampleRate)
@@ -1727,6 +1749,8 @@ vst2::IntPtr dispatch(vst2::AEffect* effect, std::int32_t opcode,
 
     if (wrapper->editor != nullptr)
         wrapper->editor->close();
+    if (wrapper->workerPreloader != nullptr)
+        wrapper->workerPreloader->stop();
     const auto result = wrapper->child->dispatcher(wrapper->child, opcode, index,
                                                    value, data, option);
     resetVlVoices(*wrapper);
@@ -1869,6 +1893,10 @@ extern "C" __declspec(dllexport) vst2::AEffect* VSTPluginMain(
         && std::filesystem::is_regular_file(sgWorkerPath);
     wrapperState->status.setAvailability(wrapperState->vlAvailable,
                                          wrapperState->sgAvailable);
+    wrapperState->workerPreloader =
+        std::make_unique<hybrid::NativeWorkerPreloader>(
+            workerPath, vxdPath, sgWorkerPath, sgVxdPath, nativeSampleRate,
+            wrapperState->vlAvailable, wrapperState->sgAvailable);
     wrapperState->status.setSampleRate(static_cast<std::uint32_t>(
         std::max(1.0f, std::round(initialRate))));
     try {

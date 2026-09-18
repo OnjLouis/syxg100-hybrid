@@ -97,6 +97,9 @@ int main(int argc, char** argv)
     std::array<float*, 2> outputs { left.data(), right.data() };
     effect->processReplacing(effect, nullptr, outputs.data(), blockSize);
 
+    if (const auto* preloadText = std::getenv("HYBRID_PROBE_PRE_EVENT_IDLE_MS"))
+        Sleep(static_cast<DWORD>(std::max(0, std::atoi(preloadText))));
+
     float peak = 0.0f;
     std::uint64_t sampleHash = 1469598103934665603ull;
     bool timingPassed = true;

@@ -31,6 +31,14 @@
 <body>
 <main>
   <h1>S-YXG100 Hybrid</h1>
+  <h2>Version 0.1.3</h2>
+  <p>Prepares the eight VL helpers and the SG helper in a serialized,
+  below-normal-priority background phase when the host activates the plug-in.
+  This removes process creation and Yamaha-engine initialization from
+  first-note MIDI processing. A single active plug-in instance reserves
+  approximately 60-70 MB for its ready helpers; hosts that prebuffer multiple
+  instances multiply that figure.</p>
+
   <h2>Version 0.1.2</h2>
   <p>Adds an accessible native editor and handles complete Yamaha model
   <code>0x64</code> Plug-in Voice bulk transactions. Songs can now load and

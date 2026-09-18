@@ -87,7 +87,9 @@ public:
         PROCESS_INFORMATION processInfo {};
         const auto created = CreateProcessW(
             workerPath.c_str(), mutableCommand.data(), nullptr, nullptr, TRUE,
-            CREATE_NO_WINDOW | EXTENDED_STARTUPINFO_PRESENT, nullptr,
+            CREATE_NO_WINDOW | EXTENDED_STARTUPINFO_PRESENT
+                | BELOW_NORMAL_PRIORITY_CLASS,
+            nullptr,
             workerPath.parent_path().c_str(), &startup.StartupInfo,
             &processInfo);
         DeleteProcThreadAttributeList(startup.lpAttributeList);
@@ -97,6 +99,7 @@ public:
         process = processInfo.hProcess;
         CloseHandle(processInfo.hThread);
         waitForResponse("initialization", 10'000);
+        SetPriorityClass(process, NORMAL_PRIORITY_CLASS);
         } catch (...) {
             cleanup(true);
             throw;

@@ -1,5 +1,14 @@
 # S-YXG100 Hybrid
 
+## Version 0.1.3
+
+Prepares the eight VL helpers and the SG helper in a serialized, below-normal-
+priority background phase when the host activates the plug-in. This removes
+process creation and Yamaha-engine initialization from first-note MIDI
+processing. A single active plug-in instance reserves approximately 60-70 MB
+for its ready helpers; hosts that prebuffer more than one instance multiply
+that figure.
+
 ## Version 0.1.2
 
 Adds an accessible native editor and handles complete Yamaha model `0x64`
@@ -58,8 +67,9 @@ sustain pedal, or all-notes-off transaction begins under one engine and its
 channel changes between XG and VL before release, the required release reaches
 both engines. Ordinary events remain routed only to their current owner.
 
-VL/PVL runs as native 32-bit code in a pool of eight lazily created one-voice
-worker processes. Legacy VL files without Yamaha voice-assignment SysEx retain
+VL/PVL runs as native 32-bit code in a pool of eight one-voice worker
+processes prepared in the background when the host activates the plug-in.
+Legacy VL files without Yamaha voice-assignment SysEx retain
 their original source channel and the monophonic behaviour of S-YXG100LE.
 Japanese PVL files explicitly assign native voice slots; only that mode maps
 workers onto Yamaha's canonical first VL part and enables up to eight-note
@@ -71,7 +81,8 @@ when a worker changes channels. XG/PVL part SysEx is filtered and remapped in
 the same way while global SysEx remains unchanged. Process isolation prevents
 the legacy Yamaha engines from overwriting shared generated-callback state.
 
-Yamaha model `0x5D` SysEx lazily starts a separate native SG worker. The wrapper
+Yamaha model `0x5D` SysEx routes singing data to a separately prepared native
+SG worker. The wrapper
 replays bounded pre-activation setup with its original timing, preserves MIDI
 and SysEx order and block offsets, queries the SG route mask, and suppresses
 only note-on/off events that SG accepts. SG never shares an address space with

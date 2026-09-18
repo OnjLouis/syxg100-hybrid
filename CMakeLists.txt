@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.25)
 
-project(SYXG100Hybrid VERSION 0.1.2 LANGUAGES CXX)
+project(SYXG100Hybrid VERSION 0.1.3 LANGUAGES CXX)
 
 if(NOT WIN32 OR CMAKE_SIZEOF_VOID_P EQUAL 8)
     message(FATAL_ERROR "S-YXG100 Hybrid currently requires a 32-bit Windows target")
@@ -24,6 +24,8 @@ add_library(SYXG100Hybrid SHARED
     Source/NativeVlClient.cpp
     Source/NativeVlClient.h
     Source/NativeVlProtocol.h
+    Source/NativeWorkerPreloader.cpp
+    Source/NativeWorkerPreloader.h
     Source/OrderedSetupHistory.h
     Source/SgRouting.cpp
     Source/SgRouting.h
@@ -295,3 +297,36 @@ target_link_options(HybridEditorTests PRIVATE
 add_test(NAME HybridEditorTests COMMAND HybridEditorTests)
 target_compile_options(HybridStatusTests PRIVATE -UNDEBUG)
 target_compile_options(HybridEditorTests PRIVATE -UNDEBUG)
+
+add_executable(NativeWorkerStub
+    Tests/NativeWorkerStub.cpp
+    Source/NativeVlProtocol.h
+)
+target_include_directories(NativeWorkerStub PRIVATE Source)
+target_compile_definitions(NativeWorkerStub PRIVATE
+    WIN32_LEAN_AND_MEAN NOMINMAX
+)
+target_link_options(NativeWorkerStub PRIVATE
+    -municode -static -static-libgcc -static-libstdc++
+)
+
+add_executable(NativeWorkerPreloaderTests
+    Tests/NativeWorkerPreloaderTests.cpp
+    Source/NativeSgClient.cpp
+    Source/NativeSgClient.h
+    Source/NativeVlClient.cpp
+    Source/NativeVlClient.h
+    Source/NativeVlProtocol.h
+    Source/NativeWorkerPreloader.cpp
+    Source/NativeWorkerPreloader.h
+)
+target_include_directories(NativeWorkerPreloaderTests PRIVATE Source)
+target_compile_definitions(NativeWorkerPreloaderTests PRIVATE
+    WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE
+)
+target_link_options(NativeWorkerPreloaderTests PRIVATE
+    -municode -static -static-libgcc -static-libstdc++
+)
+target_compile_options(NativeWorkerPreloaderTests PRIVATE -UNDEBUG)
+add_dependencies(NativeWorkerPreloaderTests NativeWorkerStub)
+add_test(NAME NativeWorkerPreloaderTests COMMAND NativeWorkerPreloaderTests)

@@ -23,6 +23,13 @@ an original S-YXG50 entry.
 
 ## Current confidence
 
+Version 0.1.3 prepares all eight VL workers and the SG worker during plug-in
+activation on a serialized, below-normal-priority background thread. This
+removes the measured 40-150 ms worker construction from first-note processing.
+The full test suite, repeated activation/shutdown churn, exact VL and SG render
+hashes, and live Foobar2000 playback pass. One instance reserves approximately
+60-70 MB for its ready helpers; Foobar2000 may prebuffer several instances.
+
 Host rates of 44.1 and 48 kHz are supported. The 44.1 kHz path retains its
 accepted sample-identical output; complete VL and SG trace renders pass through
 the new 48 kHz streaming adapter. Live Foobar2000 playback at 48 kHz confirms
