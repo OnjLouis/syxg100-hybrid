@@ -1,6 +1,7 @@
 #include "NativeSgEngine.h"
 
 #include "LeImageLoader.h"
+#include "NativeSgImagePatch.h"
 
 #include <windows.h>
 
@@ -85,7 +86,8 @@ public:
     Impl(const std::filesystem::path& vxdPath, std::uint32_t requestedRate)
     {
         try {
-            const auto image = loadLeImage(vxdPath, imageBase);
+            auto image = loadLeImage(vxdPath, imageBase);
+            patchNativeSgStartup(image);
             allocation = VirtualAlloc(reinterpret_cast<void*>(imageBase),
                                       image.size(), MEM_RESERVE | MEM_COMMIT,
                                       PAGE_EXECUTE_READWRITE);

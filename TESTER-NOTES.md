@@ -23,6 +23,13 @@ an original S-YXG50 entry.
 
 ## Current confidence
 
+Version 0.1.4 corrects an SG startup memory error exposed by Wine. Protected-
+memory tests reproduce the original crash at the reporters' instruction address
+and confirm that the corrected worker starts, renders, changes sample rate, and
+shuts down without the invalid access. Falcosoft 6.6 renders `SG_yuki.MID`
+through the corrected worker under Wine, and all retained SG demo excerpts keep
+their exact Windows and Wine sample hashes.
+
 Version 0.1.3 prepares all eight VL workers and the SG worker during plug-in
 activation on a serialized, below-normal-priority background thread. This
 removes the measured 40-150 ms worker construction from first-note processing.

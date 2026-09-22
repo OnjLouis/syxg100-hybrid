@@ -31,6 +31,12 @@
 <body>
 <main>
   <h1>S-YXG100 Hybrid</h1>
+  <h2>Version 0.1.4</h2>
+  <p>Corrects an SG startup memory error that could crash the singing worker
+  under Wine. The legacy one-slot setup now supplies the one-based slot number
+  expected by Yamaha's native helpers. The loaded image is checked before this
+  correction is applied, and the Yamaha file on disk remains unchanged.</p>
+
   <h2>Version 0.1.3</h2>
   <p>Prepares the eight VL helpers and the SG helper in a serialized,
   below-normal-priority background phase when the host activates the plug-in.
