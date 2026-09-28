@@ -12,7 +12,7 @@ param(
 $ErrorActionPreference = "Stop"
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
-$UpdaterVersion = [version]"1.0.0"
+$UpdaterVersion = [version]"1.1.0"
 $MaximumMetadataBytes = 1MB
 $MaximumPackageBytes = 100MB
 $MaximumExtractedBytes = 150MB
@@ -61,10 +61,29 @@ $Products = @(
             "syxg50-engine.bin",
             "syxg2026-hybrid.version.json"
         )
+    },
+    [pscustomobject]@{
+        Id = "OnjResearch.Mu2026Hybrid"
+        DisplayName = "Mu2026 Hybrid"
+        Slug = "mu2026-hybrid"
+        Repository = "OnjLouis/mu2026-hybrid"
+        AnchorFile = "mu2026-hybrid.dll"
+        VersionFile = "mu2026-hybrid.version.json"
+        PublicKeyXml = '<RSAKeyValue><Modulus>1WgspwnmzyFLyxAM2tdrPG1VVDm5RZvu4G4OFgpTUNJAAag1PMEB2VVY2Aqy3dY3qvGNAjObhLvAG2IrIo36fFswYHNgSyPahoOV9IgwtqMHmvLzTRHEA+koOAdoJfglO2PtGIDzJpI6MuIblUgUiZCa8K7E79Kbk1C9HGQn/+Yl9zQp7i767ddhbQdhcz4LDQSoaXLDzzl5LMTr5iq8NfSAKqBVhLWcI57gg3/KEA7aXNdgvXuXPMcA61KDaV65cydkWV3Zr6nHapYFcQjcwZpaoRv4MvKH/Gg845jxUafJHHzjiKuz2jH3wF1u0Pao3Bq23sChIESWZZ715iMfeQ==</Modulus><Exponent>AQAB</Exponent></RSAKeyValue>'
+        AllowedTargetFiles = @(
+            "mu2026-hybrid.dll",
+            "mu2000-engine.bin",
+            "mu2026-vl-worker.exe",
+            "mu2026-sg-worker.exe",
+            "MU-Engine-LICENSE.txt",
+            "MU-Engine-NOTICE.txt",
+            "Wrapper-LICENSE.txt",
+            "mu2026-hybrid.version.json"
+        )
     }
 )
 
-$AllowedProductFiles = @("README.html", "TESTER-NOTES.md")
+$AllowedProductFiles = @("README.html", "TESTER-NOTES.md", "Mu2026 Hybrid.ini", "Mu2026 Hybrid.reabank")
 $AllowedUpdaterFiles = @("Update Yamaha Hybrids.cmd", "Update-YamahaHybrids.ps1")
 $ScriptDirectory = Split-Path -Parent $MyInvocation.MyCommand.Path
 $StateRoot = Join-Path ([Environment]::GetFolderPath([Environment+SpecialFolder]::LocalApplicationData)) "Onj Research\Yamaha Hybrid Updater"
@@ -715,7 +734,7 @@ try {
     Write-UpdaterStatus "Searching for installed Onj Research Yamaha hybrid synths."
     $targets = @(Find-SynthTargets)
     if ($targets.Count -eq 0) {
-        Write-UpdaterStatus "No S-YXG100 Hybrid or S-YXG2026 Hybrid DLL was found within two folder levels of:`n$ResolvedSearchDirectory" -Always
+        Write-UpdaterStatus "No Yamaha hybrid DLL was found within two folder levels of:`n$ResolvedSearchDirectory" -Always
         Complete-Run 2
     }
 
