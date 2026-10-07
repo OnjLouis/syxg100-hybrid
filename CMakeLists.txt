@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.25)
 
-project(SYXG100Hybrid VERSION 0.1.4 LANGUAGES CXX)
+project(SYXG100Hybrid VERSION 0.1.5 LANGUAGES CXX)
 
 if(NOT WIN32 OR CMAKE_SIZEOF_VOID_P EQUAL 8)
     message(FATAL_ERROR "S-YXG100 Hybrid currently requires a 32-bit Windows target")
@@ -335,3 +335,9 @@ target_link_options(NativeWorkerPreloaderTests PRIVATE
 target_compile_options(NativeWorkerPreloaderTests PRIVATE -UNDEBUG)
 add_dependencies(NativeWorkerPreloaderTests NativeWorkerStub)
 add_test(NAME NativeWorkerPreloaderTests COMMAND NativeWorkerPreloaderTests)
+
+add_executable(MuEngineVoiceMapTests Tests/MuEngineVoiceMapTests.cpp)
+target_include_directories(MuEngineVoiceMapTests PRIVATE Source)
+target_compile_options(MuEngineVoiceMapTests PRIVATE -UNDEBUG)
+target_link_options(MuEngineVoiceMapTests PRIVATE -static)
+add_test(NAME MuEngineVoiceMapTests COMMAND MuEngineVoiceMapTests)

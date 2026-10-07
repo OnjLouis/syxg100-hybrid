@@ -31,6 +31,64 @@
 <body>
 <main>
   <h1>S-YXG100 Hybrid</h1>
+  <h2>Current package 0.1.5</h2>
+  <p>MU-derived AWM voices replace the classic small fallback sound set.
+  VL/PVL, SG, and existing software effects routing remain. S-YXG2026
+  retains 2006LE precedence for its supported voices.</p>
+  <h2>MU-derived sound set</h2>
+  <p>Complete packages now contain MU1000-derived voices and drum kits, converted
+  for the lightweight S-YXG50 software engine. The converted tables and waves are
+  embedded in <code>syxg50-engine.bin</code>, which is approximately 84 MiB.
+  No separate MU ROMs, wave tables, Python, or conversion tools are needed to
+  play it. Keep the entire VST folder together and load the Hybrid DLL.</p>
+  <p>The software XG effects processor and recovered VL/PVL/SG workers remain.
+  This is not MU hardware emulation: some three/four-element voices are folded
+  to two elements, unsupported effect types use approximations, and some loops
+  retain conversion limitations. Familiar songs can sound different. Use
+  original S-YXG50 for its original sounds, or Mu2026 for its separate
+  firmware-emulation effects path. Mixing many loud parts can exceed digital
+  full scale; retain floating-point headroom and reduce host gain when needed.</p>
+  <p>The default map is MU Native. MU Voice Map Select SysEx
+  <code>F0 43 10 49 00 00 12 00 F7</code> selects Basic;
+  replacing the final data byte with <code>01</code> selects Native.
+  The converted engine's Yamaha Settings page also offers its Basic map checkbox.
+  In 2026, use MIDI map select to keep the 2006LE routing choice synchronized.
+  Native-map QWS and REAPER definitions are in their respective package folders.
+  Install the QWS file in its instrument-list directory and load the REAPER
+  bank file in ReaControlMIDI. Sampler placeholders have been omitted.</p>
+  <p>Existing signed updaters replace the embedded engine automatically.
+  New instrument definitions are provided in the complete archive; copy those
+  into QWS or REAPER separately when updating. No manual ROM swapping is needed.
+  The GitHub source and release assets contain no Yamaha binaries or ROM data.</p>
+  <h2>Conversion credits and licence</h2>
+  <p>Thanks to Soundshock for SXG-Create, NightFright2k19 for
+  <a href="https://github.com/NightFright2k19/SXG-Create-NF">SXG-Create-NF</a>,
+  and JOELwindows7 for suggesting its integration. This conversion uses upstream
+  revision <code>596e23209cf9d08fb199769be8a9a2adf8b1e822</code>.
+  These credits supplement the existing Yamaha and original VST creator credits;
+  they do not imply endorsement or permission to redistribute Yamaha data.</p>
+  <pre>BSD 3-Clause License
+Copyright (c) 2026, Soundshock
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+1. Redistributions of source code must retain the above copyright notice, this
+   list of conditions and the following disclaimer.
+2. Redistributions in binary form must reproduce the above copyright notice,
+   this list of conditions and the following disclaimer in the documentation
+   and/or other materials provided with the distribution.
+3. Neither the name of the copyright holder nor the names of its
+   contributors may be used to endorse or promote products derived from
+   this software without specific prior written permission.
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.</pre>
   <h2>Version 0.1.4</h2>
   <p>Corrects an SG startup memory error that could crash the singing worker
   under Wine. The legacy one-slot setup now supplies the one-based slot number
@@ -53,7 +111,7 @@
   chorus settings.</p>
 
   <p>S-YXG100 Hybrid is a recovered 32-bit VST2 instrument that combines
-  the cleaner 4 MB S-YXG50 AWM engine with recovered Yamaha VL/PVL physical
+  the MU-derived S-YXG50 AWM engine with recovered Yamaha VL/PVL physical
   modelling and SG singing synthesis from S-YXG100. It was created to make
   music written for the discontinued Windows 9x S-YXG100 software playable in
   modern VST hosts.</p>
@@ -161,8 +219,10 @@ syxg100-hybrid.version.json</pre>
 
   <p>The first three files and the version marker are produced by this project.
   The three Yamaha runtime files are not distributed by the source project. A tester must
-  provide them from software they are entitled to use. Rename the compatible
-  portable S-YXG50 VST to <code>syxg50-engine.bin</code>. Its contents remain a
+  provide them from software they are entitled to use. Complete preservation
+  packages already contain the converted <code>syxg50-engine.bin</code>.
+  Source-only users may rename a compatible S-YXG50 VST to that filename,
+  but must convert it separately to obtain the expanded sound set. Its contents remain a
   Windows DLL; the different extension prevents a host from listing this private
   child engine as a second selectable S-YXG50 VST.</p>
 
@@ -209,8 +269,8 @@ WINEPREFIX="$HOME/.wine-syxg" WINEARCH=wow64 wine /path/to/vst-host.exe</pre>
 
   <h2>Where the synthesis data lives</h2>
 
-  <p>No separate <code>.tbl</code> files are required by this hybrid. The 4 MB
-  XG waveform and table payload is embedded in the resources of the supplied
+  <p>No separate <code>.tbl</code> files are required by this hybrid. The converted
+  MU waveform and table payload is embedded in the resources of the supplied
   S-YXG50 VST. The recovered VL/PVL and SG model data is contained in
   <code>Sxgpvknl.vxd</code> and <code>sxgsgknl.vxd</code>. The hybrid DLL itself
   contains integration code rather than Yamaha waveform data, which is why it
@@ -219,7 +279,7 @@ WINEPREFIX="$HOME/.wine-syxg" WINEARCH=wow64 wine /path/to/vst-host.exe</pre>
   <h2>What to expect</h2>
 
   <ul>
-    <li>Ordinary GM and XG MIDI is rendered by the 4 MB S-YXG50 engine. GM1,
+    <li>Ordinary GM and XG MIDI uses the MU-derived AWM software engine. GM1,
     GM2, GS, and XG reset messages also clear Hybrid routing state.</li>
     <li>Bank-select MSBs 33, 81, and 97 activate VL/PVL synthesis.</li>
     <li>Yamaha model <code>0x5D</code> SysEx activates SG singing synthesis.</li>

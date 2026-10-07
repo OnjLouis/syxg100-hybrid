@@ -1,5 +1,15 @@
 # S-YXG100 Hybrid Preservation Tester Notes
 
+## Current package: 0.1.5
+
+The AWM engine now embeds an MU1000-derived conversion, rather than the classic
+4 MB sound set. Keep the complete VST folder together; no separate MU ROMs,
+table files, or conversion tools are needed at runtime. QWS and REAPER definitions
+use the Native map and retain VL/PVL/SG entries. Original sound-set compatibility
+is not promised: conversion folds some voices and approximates some effects.
+Check familiar MIDI, sustained loops, drum kits, VL/SG balance, and effect tails.
+Read the HTML manual for attribution and the conversion licence notice.
+
 This is a validated preservation build for controlled testing. It is a working
 32-bit VST2 instrument and has been exercised in real time in both VSTHost and
 64-bit Foobar2000 through MIDI Player's bundled 32-bit VST bridge.

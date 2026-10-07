@@ -1,5 +1,24 @@
 # S-YXG100 Hybrid
 
+## Version 0.1.5: MU-Derived Sound Set
+
+Current complete packages use MU1000-derived AWM sounds converted with
+[NightFright2k19's SXG-Create-NF](https://github.com/NightFright2k19/SXG-Create-NF),
+a fork of Soundshock's SXG-Create. The table and converted waves are embedded
+in `syxg50-engine.bin`; VL/PVL, SG, and the software XG effects path remain.
+MU Native is the default map. MU Voice Map Select also switches the converted
+engine's Native/Basic map without affecting legacy engines lacking that feature.
+
+This is a software-engine conversion, not MU hardware emulation. Some
+three/four-element voices are folded to two elements, unsupported effect types
+use approximations, and some sample loops retain conversion limitations.
+Existing songs can sound different. Use original S-YXG50 for its original
+voices, or Mu2026 for its separate firmware-emulation effects path.
+Updated QWS and REAPER definitions accompany complete packages.
+The GitHub repository remains source-only: no Yamaha binaries, ROMs, tables,
+or demonstration MIDI are included. See the HTML manual for conversion credits
+and the BSD-3-Clause notice. Upstream revision: `596e23209cf9d08fb199769be8a9a2adf8b1e822`.
+
 ## Version 0.1.4
 
 Corrects an SG startup memory error that could crash the singing worker under
@@ -27,7 +46,8 @@ For the user-facing overview, runtime layout, current compatibility notes, and
 real-time host instructions, see [`README.html`](README.html).
 
 This source-only project combines a user-supplied 32-bit Yamaha S-YXG50 VST
-with separately recovered VL/PVL synthesis. It does not contain or distribute
+with separately recovered VL/PVL synthesis; current complete packages use a
+MU-derived conversion of that AWM engine. This repository does not contain or distribute
 Yamaha executables, tables, presets, demo files, or firmware.
 
 S-YXG100 Hybrid brings the discontinued Windows 9x VL/PVL and SG engines into

@@ -2,6 +2,7 @@
 #include "HybridStatus.h"
 #include "MidiRouter.h"
 #include "MidiSystemReset.h"
+#include "MuEngineVoiceMap.h"
 #include "MidiChannelSnapshot.h"
 #include "NativeEventTimeline.h"
 #include "NativeSgClient.h"
@@ -60,11 +61,11 @@ constexpr char hybridVendorName[] = "Onj Research";
 constexpr hybrid::HybridEditorConfig editorConfig {
     L"SYXG100HybridAccessibleEditor",
     L"S-YXG100 Hybrid",
-    L"XG50",
+    L"MU-derived/XG50",
     L"",
     L"1. SG claims note events for channels in its native route mask.\r\n"
     L"2. Bank MSB 33, 81, or 97 selects VL/PVL.\r\n"
-    L"3. Remaining MIDI continues to the original S-YXG50 engine.\r\n"
+    L"3. Remaining MIDI uses the supplied AWM engine (MU-derived in current packages).\r\n"
     L"4. VL and SG dry, reverb, chorus, and variation buses enter S-YXG50 "
     L"before Yamaha effects processing."
 };
@@ -1240,6 +1241,7 @@ vst2::IntPtr processEvents(WrapperState& wrapper, const vst2::Events* events)
                         + static_cast<std::uint64_t>(
                             std::max(0, sysex->deltaFrames));
                     const auto systemReset = hybrid::classifySystemReset(bytes);
+                    (void)hybrid::applyMuEngineVoiceMap(wrapper.child, bytes);
                     if (systemReset != hybrid::MidiSystemReset::none) {
                         wrapper.router.reset();
                         wrapper.partModes.reset(systemReset);
