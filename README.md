@@ -1,5 +1,18 @@
 # S-YXG100 Hybrid
 
+## Version 0.1.7: Master-Volume Fades
+
+XG and Universal Real-Time Master Volume now affect the external VL/PVL
+audio at the correct MIDI event time. FatPizz's closing plucked lead fades
+with the backing instead of remaining prominent. SG already handles master
+volume internally and is not attenuated twice. Full-volume gain is unchanged,
+and effects retain their natural decay.
+
+The external fade uses a power-law envelope, not a bit-exact reconstruction
+of Yamaha's quantized voice-volume curve. Intermediate-level hardware parity
+is not claimed. GM/GM2/GS/XG resets restore the external master envelope.
+Existing insertion-effect limitations and host-headroom requirements remain.
+
 ## Version 0.1.6: Voice Mapping and Independent Insertions
 
 Independent MU Effect 2 distortion (49/00) and overdrive (4A/00) can

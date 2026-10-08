@@ -3,6 +3,7 @@
 #include "HybridStatus.h"
 #include "MidiRouter.h"
 #include "MidiSystemReset.h"
+#include "MasterVolumeTimeline.h"
 #include "MuEngineVoiceMap.h"
 #include "MidiChannelSnapshot.h"
 #include "NativeEventTimeline.h"
@@ -222,6 +223,9 @@ struct WrapperState {
     std::array<hybrid::ipc::TimedMidiEvent, maxPendingVlEvents>
         vlTimedMidiScratch {};
     std::vector<float> vlOutputBuses;
+    hybrid::MasterVolumeTimeline masterVolume;
+    std::vector<float> masterVolumeGains;
+    std::uint64_t masterVolumeFrame {};
     std::size_t vlOutputCapacityFrames {};
     std::vector<float> nativeOutputBuses;
     std::size_t nativeOutputCapacityFrames {};
@@ -267,6 +271,7 @@ void configureAudioBuffers(WrapperState& wrapper,
         * (static_cast<double>(nativeSampleRate) / hostRate))) + 4;
     wrapper.nativeOutputBuses.assign(
         wrapper.nativeOutputCapacityFrames * nativeTransportBusCount, 0.0f);
+    wrapper.masterVolumeGains.assign(wrapper.nativeOutputCapacityFrames, 1.0f);
 }
 
 WrapperState* state(vst2::AEffect* effect)
@@ -635,6 +640,7 @@ void configureVl(WrapperState& wrapper, float sampleRate)
     for (auto& voice : wrapper.vlVoices)
         voice.timelineFrame = nativeFrame(wrapper, wrapper.sgTimelineFrames);
     wrapper.sg.timelineFrame = nativeFrame(wrapper, wrapper.sgTimelineFrames);
+    wrapper.masterVolumeFrame = nativeFrame(wrapper, wrapper.sgTimelineFrames);
 }
 
 std::uint32_t packedMessage(const vst2::MidiEvent& event)
@@ -1277,6 +1283,8 @@ vst2::IntPtr processEvents(WrapperState& wrapper, const vst2::Events* events)
                     const auto eventFrame = wrapper.sgTimelineFrames
                         + static_cast<std::uint64_t>(
                             std::max(0, sysex->deltaFrames));
+                    if (!wrapper.masterVolume.observe(bytes, eventFrame))
+                        return 0;
                     const auto systemReset = hybrid::classifySystemReset(bytes);
                     if (systemReset != hybrid::MidiSystemReset::none)
                         wrapper.convertedBankRouter.reset();
@@ -1442,9 +1450,10 @@ void mixVlChannelBlock(WrapperState& wrapper, VlVoiceState& voice,
         auto* left = nativeBus(wrapper, busOffset + plane * 2);
         auto* right = nativeBus(wrapper, busOffset + plane * 2 + 1);
         for (std::uint32_t frame = 0; frame < frames; ++frame) {
-            left[outputOffset + frame] += stereo[frame * 2] * int16Scale;
+            const auto gain = wrapper.masterVolumeGains[outputOffset + frame];
+            left[outputOffset + frame] += stereo[frame * 2] * int16Scale * gain;
             right[outputOffset + frame] += stereo[frame * 2 + 1]
-                * int16Scale;
+                * int16Scale * gain;
         }
     }
 }
@@ -1603,6 +1612,14 @@ bool renderNativeAudio(WrapperState& wrapper, std::int32_t frames,
     for (std::size_t bus = 0; bus < nativeTransportBusCount; ++bus) {
         std::fill_n(nativeBus(wrapper, bus), frames, 0.0f);
     }
+    const auto hostRate = static_cast<std::uint32_t>(
+        std::max(1.0f, std::round(wrapper.sampleRate)));
+    for (std::int32_t frame = 0; frame < frames; ++frame) {
+        const auto hostFrame = (wrapper.masterVolumeFrame + frame)
+            * hostRate / nativeSampleRate;
+        wrapper.masterVolumeGains[frame] = wrapper.masterVolume.gainAt(hostFrame);
+    }
+    wrapper.masterVolumeFrame += static_cast<std::uint64_t>(frames);
     std::int32_t outputOffset = 0;
     while (outputOffset < frames) {
         const auto block = static_cast<std::uint32_t>(

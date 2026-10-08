@@ -1,8 +1,13 @@
 # S-YXG100 Hybrid Preservation Tester Notes
 
-## Current package: 0.1.6
+## Current package: 0.1.7
 
-This release restores converted MU-exclusive sub-banks (including Anathema),
+This update makes VL/PVL follow XG and Universal Real-Time Master Volume.
+Compare FatPizz's closing fade and confirm full-volume playback is unchanged.
+SG is not attenuated twice; reverb and other effects retain natural tails.
+The external-source curve is not an exact Yamaha hardware envelope.
+
+The preceding release restores converted MU-exclusive sub-banks (including Anathema),
 corrects SFX Techno Kit selection, and translates independent MU distortion
 and overdrive for external VL/PVL and a single routed SG part. The private
 processor honours Dry/Wet and feeds the song's system sends once.

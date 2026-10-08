@@ -31,7 +31,11 @@
 <body>
 <main>
   <h1>S-YXG100 Hybrid</h1>
-  <h2>Current package 0.1.6</h2>
+  <h2>Current package 0.1.7</h2>
+  <p>This update corrects master-volume fades for VL/PVL, including the closing
+  lead in FatPizz. SG retains its native volume handling and effects retain
+  natural tails. Full-volume gain is unchanged. The external-source envelope
+  is not a claim of bit-identical Yamaha hardware behaviour.</p>
   <p>MU-derived AWM voices replace the classic small fallback sound set.
   VL/PVL, SG, and existing software effects routing remain. S-YXG2026
   retains 2006LE precedence for its supported voices.</p>
@@ -85,6 +89,14 @@
   New instrument definitions are provided in the complete archive; copy those
   into QWS or REAPER separately when updating. No manual ROM swapping is needed.
   The GitHub source and release assets contain no Yamaha binaries or ROM data.</p>
+  <h2>Master volume</h2>
+  <p>XG Master Volume and Universal Real-Time Master Volume also control the
+  added VL/PVL audio. Fades therefore include those voices, rather than only
+  the original XG backing. Full master volume does not add gain. SG keeps its
+  own native master-volume handling and is not attenuated twice. Effects retain
+  their natural tails. The external source uses a power-law envelope; Yamaha's
+  quantized native envelope may differ at intermediate levels.
+  This is not a claim of bit-identical hardware behaviour.</p>
   <h2>Conversion credits and licence</h2>
   <p>Thanks to Soundshock for SXG-Create, NightFright2k19 for
   <a href="https://github.com/NightFright2k19/SXG-Create-NF">SXG-Create-NF</a>,
