@@ -1,5 +1,25 @@
 # S-YXG100 Hybrid
 
+## Version 0.1.6: Voice Mapping and Independent Insertions
+
+Independent MU Effect 2 distortion (49/00) and overdrive (4A/00) can
+be translated for external VL/PVL audio and a single routed SG part using
+separate voice-free software XG DSP instances. Normal XG reverb, chorus
+and variation, including system delay, are retained; MU DSP is not substituted.
+Private insertion connection preserves the requested Dry/Wet balance. Its own
+system sends are disabled; the processed output feeds the song's sends once.
+No additional gain trim is applied to imitate MU levels.
+This is an experimental compatibility feature, not hardware-equivalent MU
+effects. Distortion increases peaks and may require more host headroom.
+Converted AWM/2006LE insertion processing, other algorithms, effect-controller
+modulation, chained assignments and inseparable multi-part SG routes are not
+implemented. Pan/send proportions use the existing 128-frame DSP quantum.
+
+This release restores converted MU-exclusive MSB 48 sub-banks, including
+Anathema, and preserves SFX drum bank 126 under explicit rhythm assignments.
+The sub-banks require the matching extended converted engine. These changes
+are included in the complete package and signed update. See the HTML guide for limitations.
+
 ## Version 0.1.5: MU-Derived Sound Set
 
 Current complete packages use MU1000-derived AWM sounds converted with

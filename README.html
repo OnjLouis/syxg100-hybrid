@@ -31,14 +31,39 @@
 <body>
 <main>
   <h1>S-YXG100 Hybrid</h1>
-  <h2>Current package 0.1.5</h2>
+  <h2>Current package 0.1.6</h2>
   <p>MU-derived AWM voices replace the classic small fallback sound set.
   VL/PVL, SG, and existing software effects routing remain. S-YXG2026
   retains 2006LE precedence for its supported voices.</p>
+  <h2>Voice and drum mapping corrections</h2>
+  <p>This release corrects MU-exclusive MSB 48 sub-banks,
+  including Anathema, and preserves SFX drum bank 126 when a part has an
+  explicit rhythm assignment. The latter prevents SFX Techno Kit from being
+  mistaken for a standard drum kit. These changes require the matching
+  converted engine; an older engine retains its previous bank support.</p>
+  <h2>Experimental MU insertion compatibility</h2>
+  <p>This release can translate independent MU Effect 2
+  distortion (49/00) and overdrive (4A/00) assignments for external VL/PVL
+  audio and a single routed SG part. Each supported insertion uses a separate,
+  voice-free instance of the existing software XG DSP. The song's normal XG
+  reverb, chorus and variation remain unchanged, including system delay.</p>
+  <p>The private processor uses insertion connection, so the requested Dry/Wet
+  balance is honoured. Its own system-effect sends are disabled; the processed
+  output enters the song's existing sends once. No MU-matching gain trim is applied.</p>
+  <p>This is an approximation using XG algorithms, not the MU effects chip.
+  It does not add independent insertions to converted AWM or 2006LE voices.
+  Unsupported algorithms, effect-controller modulation, chained assignments
+  and inseparable multi-part SG routes remain bypassed. Worker pan and send
+  proportions are recovered over the existing 128-frame DSP quantum.
+  Distortion can increase peaks and require additional host headroom.
+  Listening tests confirm the restored FatPizz lead, but its balance differs
+  from MU firmware emulation. Hardware-identical timbre and level are not
+  claimed; no compensating limiter or shared gain change has been added.</p>
   <h2>MU-derived sound set</h2>
   <p>Complete packages now contain MU1000-derived voices and drum kits, converted
   for the lightweight S-YXG50 software engine. The converted tables and waves are
-  embedded in <code>syxg50-engine.bin</code>, which is approximately 84 MiB.
+  embedded in <code>syxg50-engine.bin</code>, which is approximately 87 MiB
+  with the extended banks included in this release.
   No separate MU ROMs, wave tables, Python, or conversion tools are needed to
   play it. Keep the entire VST folder together and load the Hybrid DLL.</p>
   <p>The software XG effects processor and recovered VL/PVL/SG workers remain.

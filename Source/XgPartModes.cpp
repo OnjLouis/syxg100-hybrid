@@ -86,8 +86,13 @@ std::uint8_t XgPartModes::effectiveBankMsb(
         return selectedBankMsb;
     if (systemMode == MidiSystemReset::gm2)
         return gm2RhythmBankMsb;
-    if (systemMode == MidiSystemReset::xg)
-        return rhythmBankMsb;
+    if (systemMode == MidiSystemReset::xg) {
+        // Part Mode assigns a drum setup, not a kit family. MSB 126 is
+        // Yamaha's SFX kit bank and must not become the normal MSB 127 bank.
+        constexpr std::uint8_t sfxRhythmBankMsb = 126;
+        return selectedBankMsb == sfxRhythmBankMsb
+            ? sfxRhythmBankMsb : rhythmBankMsb;
+    }
     return selectedBankMsb;
 }
 

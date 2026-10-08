@@ -95,5 +95,13 @@ int main()
     modes.reset(hybrid::MidiSystemReset::xg);
     expect(modes.selectBankMsb(9, 0) && !modes.isRhythm(9),
            "XG bank selection can still make channel 10 melodic");
+    constexpr std::array<std::uint8_t, 9> sfxRhythm {
+        0xf0, 0x43, 0x10, 0x4c, 0x08, 0x08, 0x07, 0x03, 0xf7
+    };
+    (void)modes.observe(sfxRhythm);
+    expect(modes.effectiveBankMsb(8, 126) == 126,
+           "explicit XG rhythm mode preserves SFX drum bank 126");
+    expect(modes.effectiveBankMsb(8, 127) == 127,
+           "ordinary rhythm bank remains 127");
     return failures == 0 ? 0 : 1;
 }

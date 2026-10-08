@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.25)
 
-project(SYXG100Hybrid VERSION 0.1.5 LANGUAGES CXX)
+project(SYXG100Hybrid VERSION 0.1.6 LANGUAGES CXX)
 
 if(NOT WIN32 OR CMAKE_SIZEOF_VOID_P EQUAL 8)
     message(FATAL_ERROR "S-YXG100 Hybrid currently requires a 32-bit Windows target")
@@ -9,6 +9,13 @@ endif()
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
+
+add_executable(MuExternalInsertionTests
+    Tests/MuExternalInsertionTests.cpp Source/MuExternalInsertions.cpp
+    Source/XgEffectsBridge.cpp)
+target_include_directories(MuExternalInsertionTests PRIVATE Source)
+target_link_options(MuExternalInsertionTests PRIVATE -static -static-libgcc -static-libstdc++)
+add_test(NAME MuExternalInsertionTests COMMAND MuExternalInsertionTests)
 
 add_library(SYXG100Hybrid SHARED
     Source/HybridEditor.cpp
@@ -39,6 +46,7 @@ add_library(SYXG100Hybrid SHARED
     Source/XgPartModes.cpp
     Source/XgPartModes.h
     Source/HybridVst.cpp
+    Source/MuExternalInsertions.cpp
     Source/Vst2Abi.h
     Source/exports.def
 )
@@ -129,6 +137,11 @@ target_link_options(HybridEditorHostProbe PRIVATE
 )
 
 enable_testing()
+
+add_executable(ConvertedMuVoiceMapTests Tests/ConvertedMuVoiceMapTests.cpp)
+target_include_directories(ConvertedMuVoiceMapTests PRIVATE Source)
+target_link_options(ConvertedMuVoiceMapTests PRIVATE -static -static-libgcc -static-libstdc++)
+add_test(NAME ConvertedMuVoiceMapTests COMMAND ConvertedMuVoiceMapTests)
 
 add_executable(NativeSgStartupTests Tests/NativeSgStartupTests.cpp)
 target_include_directories(NativeSgStartupTests PRIVATE Source)

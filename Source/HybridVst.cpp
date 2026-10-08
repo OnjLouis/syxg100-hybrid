@@ -1,4 +1,5 @@
 #include "HybridEditor.h"
+#include "ConvertedMuVoiceMap.h"
 #include "HybridStatus.h"
 #include "MidiRouter.h"
 #include "MidiSystemReset.h"
@@ -16,6 +17,7 @@
 #include "VlVoiceAllocator.h"
 #include "Vst2Abi.h"
 #include "XgEffectsBridge.h"
+#include "MuExternalInsertions.h"
 #include "XgPartModes.h"
 
 #include <windows.h>
@@ -53,6 +55,8 @@ constexpr float defaultNativeOutputGain = 3.5f;
 constexpr float xgInternalBusScale = 32768.0f;
 constexpr std::uint32_t nativeSampleRate = 44'100;
 constexpr std::size_t vlOutputBusCount = hybrid::ipc::planeCount * 2;
+constexpr std::size_t nativeTransportBusCount = vlOutputBusCount
+    * (1 + hybrid::MuExternalInsertions::slotCount);
 constexpr std::size_t xgCachedFramesOffset = 0x100;
 constexpr std::int32_t hybridUniqueId = 0x53314859; // "S1HY"
 constexpr std::int32_t hybridVendorVersion = 100;
@@ -175,6 +179,13 @@ struct ChildEventBatch {
 struct WrapperState {
     HMODULE module {};
     vst2::AEffect* child {};
+    hybrid::MuExternalInsertions externalInsertions;
+    std::array<std::unique_ptr<hybrid::XgExternalInsertion>,
+        hybrid::MuExternalInsertions::slotCount> insertionProcessors;
+    hybrid::ConvertedMuVoiceMap convertedVoiceMap;
+    hybrid::ConvertedMuBankRouter convertedBankRouter;
+    std::array<vst2::MidiEvent, 1024> convertedBankEvents {};
+    std::size_t convertedBankEventCount {};
     std::filesystem::path vxdPath;
     std::filesystem::path workerPath;
     std::filesystem::path sgVxdPath;
@@ -244,18 +255,18 @@ void configureAudioBuffers(WrapperState& wrapper,
     wrapper.vlOutputCapacityFrames = (requestedFrames + quantum - 1)
         / quantum * quantum;
     wrapper.vlOutputBuses.assign(
-        wrapper.vlOutputCapacityFrames * vlOutputBusCount, 0.0f);
+        wrapper.vlOutputCapacityFrames * nativeTransportBusCount, 0.0f);
 
     const auto hostRate = static_cast<std::uint32_t>(
         std::max(1.0f, std::round(wrapper.sampleRate)));
     wrapper.nativeRateAdapter.configure(
-        nativeSampleRate, hostRate, vlOutputBusCount,
+        nativeSampleRate, hostRate, nativeTransportBusCount,
         wrapper.vlOutputCapacityFrames);
     wrapper.nativeOutputCapacityFrames = static_cast<std::size_t>(std::ceil(
         wrapper.vlOutputCapacityFrames
         * (static_cast<double>(nativeSampleRate) / hostRate))) + 4;
     wrapper.nativeOutputBuses.assign(
-        wrapper.nativeOutputCapacityFrames * vlOutputBusCount, 0.0f);
+        wrapper.nativeOutputCapacityFrames * nativeTransportBusCount, 0.0f);
 }
 
 WrapperState* state(vst2::AEffect* effect)
@@ -1023,6 +1034,30 @@ bool retainPartModeChange(WrapperState& wrapper,
     return true;
 }
 
+void retainConvertedBank(WrapperState& wrapper, std::uint8_t channel,
+                         std::int32_t deltaFrames, bool forceNew,
+                         std::optional<std::uint8_t> program = std::nullopt)
+{
+    if (!wrapper.convertedBankRouter.needsTranslation(
+            wrapper.convertedVoiceMap, channel)) return;
+    const auto count = program ? 3u : 2u;
+    if (wrapper.convertedBankEventCount + count > wrapper.convertedBankEvents.size())
+        throw std::runtime_error("converted MU bank event queue is full");
+    const auto append = [&](std::uint8_t status, std::uint8_t data1, std::uint8_t data2) {
+        auto& event = wrapper.convertedBankEvents[wrapper.convertedBankEventCount++];
+        event = {};
+        event.deltaFrames = deltaFrames;
+        event.midiData[0] = static_cast<char>(status | channel);
+        event.midiData[1] = static_cast<char>(data1);
+        event.midiData[2] = static_cast<char>(data2);
+        retainChildEvent(wrapper, reinterpret_cast<vst2::Event*>(&event), forceNew);
+        forceNew = false;
+    };
+    append(0xb0, 0, wrapper.convertedBankRouter.engineBank(wrapper.convertedVoiceMap, channel));
+    append(0xb0, 32, 0);
+    if (program) append(0xc0, *program, 0);
+}
+
 void clearChildEvents(WrapperState& wrapper)
 {
     for (std::size_t index = 0; index < wrapper.childBatchCount; ++index)
@@ -1037,6 +1072,7 @@ vst2::IntPtr processEvents(WrapperState& wrapper, const vst2::Events* events)
     if (events->numEvents > 0)
         wrapper.status.markMidiActivity();
     wrapper.syntheticPartModeEventCount = 0;
+    wrapper.convertedBankEventCount = 0;
     const auto firstNewBatch = wrapper.childBatchCount;
     bool firstChildEvent = true;
     vst2::IntPtr result = 0;
@@ -1047,6 +1083,7 @@ vst2::IntPtr processEvents(WrapperState& wrapper, const vst2::Events* events)
             if (event != nullptr && event->type == 1) {
                 const auto* midi = reinterpret_cast<const vst2::MidiEvent*>(event);
                 const auto packed = packedMessage(*midi);
+                wrapper.convertedBankRouter.observeShort(packed);
                 const auto channel = static_cast<std::uint8_t>(packed & 0x0f);
                 const auto operation = static_cast<std::uint8_t>(packed & 0xf0);
                 const auto controller = static_cast<std::uint8_t>(
@@ -1241,6 +1278,9 @@ vst2::IntPtr processEvents(WrapperState& wrapper, const vst2::Events* events)
                         + static_cast<std::uint64_t>(
                             std::max(0, sysex->deltaFrames));
                     const auto systemReset = hybrid::classifySystemReset(bytes);
+                    if (systemReset != hybrid::MidiSystemReset::none)
+                        wrapper.convertedBankRouter.reset();
+                    wrapper.convertedBankRouter.observeSysex(bytes);
                     (void)hybrid::applyMuEngineVoiceMap(wrapper.child, bytes);
                     if (systemReset != hybrid::MidiSystemReset::none) {
                         wrapper.router.reset();
@@ -1251,6 +1291,12 @@ vst2::IntPtr processEvents(WrapperState& wrapper, const vst2::Events* events)
                         if (wrapper.sg.client == nullptr)
                             clearSgSetup(wrapper);
                     }
+                    if (systemReset != hybrid::MidiSystemReset::none) {
+                        wrapper.externalInsertions.reset();
+                        for (auto& processor : wrapper.insertionProcessors)
+                            if (processor) processor->reset();
+                    }
+                    wrapper.externalInsertions.observe(bytes);
                     (void)wrapper.partModes.observe(bytes);
                     if (const auto assignment =
                             hybrid::vlVoiceAssignment(bytes)) {
@@ -1329,8 +1375,30 @@ vst2::IntPtr processEvents(WrapperState& wrapper, const vst2::Events* events)
             }
 
             if (sendToChild && event != nullptr) {
+                if (event->type == 1) {
+                    const auto* midi = reinterpret_cast<const vst2::MidiEvent*>(event);
+                    if ((static_cast<unsigned char>(midi->midiData[0]) & 0xf0) == 0xc0) {
+                        const auto previousCount = wrapper.convertedBankEventCount;
+                        retainConvertedBank(wrapper, midi->midiData[0] & 15,
+                            midi->deltaFrames, firstChildEvent);
+                        if (wrapper.convertedBankEventCount != previousCount)
+                            firstChildEvent = false;
+                    }
+                }
                 retainChildEvent(wrapper, event, firstChildEvent);
                 firstChildEvent = false;
+                if (event->type == 6) {
+                    const auto* sysex = reinterpret_cast<const vst2::SysexEvent*>(event);
+                    const auto* bytes = reinterpret_cast<const std::uint8_t*>(sysex->sysexDump);
+                    if (bytes != nullptr && sysex->dumpBytes >= 9 && bytes[1] == 0x43
+                        && (bytes[2] & 0xf0) == 0x10 && bytes[3] == 0x4c
+                        && bytes[4] == 8 && bytes[5] < 16 && bytes[6] <= 3) {
+                        const auto index = 7 + 3 - bytes[6];
+                        if (index + 1 < sysex->dumpBytes)
+                            retainConvertedBank(wrapper, bytes[5], sysex->deltaFrames,
+                                false, bytes[index] & 127);
+                    }
+                }
             }
         }
     } catch (const std::exception& error) {
@@ -1363,10 +1431,16 @@ float* nativeBus(WrapperState& wrapper, std::size_t bus)
 void mixVlChannelBlock(WrapperState& wrapper, VlVoiceState& voice,
                        std::int32_t outputOffset, std::uint32_t frames)
 {
+    const auto voiceIndex = static_cast<std::size_t>(
+        &voice - wrapper.vlVoices.data());
+    const auto insertion = wrapper.externalInsertions.target(
+        wrapper.vlVoiceAllocator.channel(voiceIndex));
+    const auto busOffset = insertion && wrapper.insertionProcessors[*insertion]
+        ? vlOutputBusCount * (1 + *insertion) : 0;
     for (std::size_t plane = 0; plane < hybrid::ipc::planeCount; ++plane) {
         const auto stereo = voice.client->plane(plane, frames);
-        auto* left = nativeBus(wrapper, plane * 2);
-        auto* right = nativeBus(wrapper, plane * 2 + 1);
+        auto* left = nativeBus(wrapper, busOffset + plane * 2);
+        auto* right = nativeBus(wrapper, busOffset + plane * 2 + 1);
         for (std::uint32_t frame = 0; frame < frames; ++frame) {
             left[outputOffset + frame] += stereo[frame * 2] * int16Scale;
             right[outputOffset + frame] += stereo[frame * 2 + 1]
@@ -1408,10 +1482,14 @@ void renderSgSegment(WrapperState& wrapper, std::int32_t outputOffset,
         const auto block = static_cast<std::uint32_t>(std::min<std::int32_t>(
             frames, hybrid::NativeSgClient::maxFrames));
         wrapper.sg.client->render(block);
+        const auto insertion = wrapper.externalInsertions.soleTarget(
+            wrapper.sg.routeMask);
+        const auto busOffset = insertion && wrapper.insertionProcessors[*insertion]
+            ? vlOutputBusCount * (1 + *insertion) : 0;
         for (std::size_t plane = 0; plane < hybrid::ipc::planeCount; ++plane) {
             const auto stereo = wrapper.sg.client->plane(plane, block);
-            auto* left = nativeBus(wrapper, plane * 2);
-            auto* right = nativeBus(wrapper, plane * 2 + 1);
+            auto* left = nativeBus(wrapper, busOffset + plane * 2);
+            auto* right = nativeBus(wrapper, busOffset + plane * 2 + 1);
             for (std::uint32_t frame = 0; frame < block; ++frame) {
                 left[outputOffset + frame] += stereo[frame * 2] * int16Scale;
                 right[outputOffset + frame] += stereo[frame * 2 + 1]
@@ -1522,7 +1600,7 @@ bool renderNativeAudio(WrapperState& wrapper, std::int32_t frames,
             > wrapper.nativeOutputCapacityFrames) {
         return false;
     }
-    for (std::size_t bus = 0; bus < vlOutputBusCount; ++bus) {
+    for (std::size_t bus = 0; bus < nativeTransportBusCount; ++bus) {
         std::fill_n(nativeBus(wrapper, bus), frames, 0.0f);
     }
     std::int32_t outputOffset = 0;
@@ -1568,13 +1646,13 @@ bool renderVl(WrapperState& wrapper, std::int32_t frames,
         || static_cast<std::size_t>(frames) > wrapper.vlOutputCapacityFrames) {
         return false;
     }
-    for (std::size_t bus = 0; bus < vlOutputBusCount; ++bus)
+    for (std::size_t bus = 0; bus < nativeTransportBusCount; ++bus)
         std::fill_n(vlBus(wrapper, bus), frames, 0.0f);
 
     if (!wrapper.nativeRateAdapter.active()) {
         if (!renderNativeAudio(wrapper, frames, cachedPrefix))
             return false;
-        for (std::size_t bus = 0; bus < vlOutputBusCount; ++bus) {
+        for (std::size_t bus = 0; bus < nativeTransportBusCount; ++bus) {
             std::copy_n(nativeBus(wrapper, bus), frames, vlBus(wrapper, bus));
         }
     } else {
@@ -1582,15 +1660,32 @@ bool renderVl(WrapperState& wrapper, std::int32_t frames,
             static_cast<std::size_t>(frames));
         if (!renderNativeAudio(wrapper, static_cast<std::int32_t>(needed), 0))
             return false;
-        std::array<const float*, vlOutputBusCount> input {};
-        std::array<float*, vlOutputBusCount> output {};
-        for (std::size_t bus = 0; bus < vlOutputBusCount; ++bus) {
+        std::array<const float*, nativeTransportBusCount> input {};
+        std::array<float*, nativeTransportBusCount> output {};
+        for (std::size_t bus = 0; bus < nativeTransportBusCount; ++bus) {
             input[bus] = nativeBus(wrapper, bus);
             output[bus] = vlBus(wrapper, bus);
         }
         wrapper.nativeRateAdapter.append(input, needed);
         wrapper.nativeRateAdapter.process(
             output, static_cast<std::size_t>(frames));
+    }
+    for (std::size_t slot = 0; slot < wrapper.insertionProcessors.size(); ++slot) {
+        auto& processor = wrapper.insertionProcessors[slot];
+        if (!processor || !wrapper.externalInsertions.slot(slot).supported())
+            continue;
+        std::array<float*, vlOutputBusCount> source {}, mix {};
+        for (std::size_t bus = 0; bus < vlOutputBusCount; ++bus) {
+            source[bus] = vlBus(wrapper, vlOutputBusCount*(1+slot)+bus);
+            mix[bus] = vlBus(wrapper, bus);
+        }
+        if (!processor->render(wrapper.externalInsertions.slot(slot),
+                source, mix, static_cast<std::size_t>(frames),
+                wrapper.nativeOutputGain)) {
+            for (std::size_t bus = 0; bus < vlOutputBusCount; ++bus)
+                for (std::int32_t frame = 0; frame < frames; ++frame)
+                    mix[bus][frame] += source[bus][frame];
+        }
     }
     if (!wrapper.vlRenderDiagnosticWritten) {
         float peak = 0.0f;
@@ -1734,6 +1829,9 @@ vst2::IntPtr dispatch(vst2::AEffect* effect, std::int32_t opcode,
             wrapper->child, opcode, index, value, data, option);
         if (opcode == vst2::setSampleRate)
             configureVl(*wrapper, option);
+        if (opcode == vst2::setSampleRate)
+            for (auto& processor : wrapper->insertionProcessors)
+                if (processor) processor->setSampleRate(option);
         if (opcode == vst2::setBlockSize && value > 0) {
             try {
                 configureAudioBuffers(*wrapper,
@@ -1757,6 +1855,8 @@ vst2::IntPtr dispatch(vst2::AEffect* effect, std::int32_t opcode,
                                                    value, data, option);
     resetVlVoices(*wrapper);
     clearSg(*wrapper);
+    for (auto& processor : wrapper->insertionProcessors)
+        processor.reset();
     if (wrapper->module != nullptr) {
         if (wrapper->xgEffectsBridgeAvailable)
             hybrid::XgEffectsBridge::release(wrapper->module);
@@ -1883,6 +1983,7 @@ extern "C" __declspec(dllexport) vst2::AEffect* VSTPluginMain(
     }
     wrapperState->module = module;
     wrapperState->child = child;
+    wrapperState->convertedVoiceMap = hybrid::ConvertedMuVoiceMap::load(childPath);
     wrapperState->vxdPath = vxdPath;
     wrapperState->workerPath = workerPath;
     wrapperState->sgVxdPath = sgVxdPath;
@@ -1916,6 +2017,17 @@ extern "C" __declspec(dllexport) vst2::AEffect* VSTPluginMain(
         static_cast<DWORD>(std::size(disableEffects))) != 0;
     wrapperState->xgEffectsBridgeAvailable = !effectsDisabled
         && hybrid::XgEffectsBridge::acquire(module);
+    if (wrapperState->xgEffectsBridgeAvailable) {
+        try {
+            for (auto& processor : wrapperState->insertionProcessors)
+                processor = std::make_unique<hybrid::XgExternalInsertion>(
+                    entry, host, initialRate);
+        } catch (const std::exception& error) {
+            reportVlFailure("MU insertion DSP initialization failure", error.what());
+            for (auto& processor : wrapperState->insertionProcessors)
+                processor.reset();
+        }
+    }
     wrapperState->status.setEffectsBridgeAvailable(
         wrapperState->xgEffectsBridgeAvailable);
     wrapperState->editor = std::make_unique<hybrid::HybridEditor>(
