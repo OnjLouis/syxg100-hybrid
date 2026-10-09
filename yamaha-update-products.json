@@ -1,0 +1,60 @@
+[
+  {
+    "Id": "OnjResearch.SYXG100Hybrid",
+    "DisplayName": "S-YXG100 Hybrid",
+    "Slug": "syxg100-hybrid",
+    "Repository": "OnjLouis/syxg100-hybrid",
+    "AnchorFile": "syxg100-hybrid.dll",
+    "VersionFile": "syxg100-hybrid.version.json",
+    "PublicKeyXml": "<RSAKeyValue><Modulus>spcmbu8AcaBqxN07TTcUPbpIGI4/oi6kLhe9ELY+/Aje38nLf3cA1kN6fceCtyeLqK8MhHrCOYgfNBIsE+roBgl5XUEfhNCv91wYIOnUPGD6Rgn2VvW3Qp+fsWb7FLD6J2YKhdjw5sMBVk87xtLtL+zMU3iziyQhimxNrX92kvdfr3bSSHJi+xo1sCFusZ7DMNgCpIkW6+6EBG79tyeVVvuZpk3oGiuV8Og5EFbL15stztWimWk4ZRy3OtTkxH3uyaEbfxfMr+FsmLtTqgoSuxvWPp7u5chlGMJgrbG3w7nA4w8aZddU976Vitl0j34+2HEUGZoXAm7oykh6AtnESWsyZU2yDRqHiz8EXd6mhvuxxu2L4ZudeoCy7+FpCnQ1cJzKTpOfPnrOfEGEnNfc5jGQqlvCviL2Xxfq330ay/ubMAOmjzkQC5Jsahb4RWV0a9C4lcf+RlbztAwdf9L02mOeEHQmF/51yciQ6DYjqDDVcCDI3q3dJLuSDkakWlrh</Modulus><Exponent>AQAB</Exponent></RSAKeyValue>",
+    "AllowedTargetFiles": [
+      "Sxgpvknl.vxd",
+      "sxgsgknl.vxd",
+      "syxg100-hybrid.dll",
+      "syxg100-sg-worker.exe",
+      "syxg100-vl-worker.exe",
+      "syxg50-engine.bin",
+      "syxg100-hybrid.version.json"
+    ]
+  },
+  {
+    "Id": "OnjResearch.SYXG2026Hybrid",
+    "DisplayName": "S-YXG2026 Hybrid",
+    "Slug": "syxg2026-hybrid",
+    "Repository": "OnjLouis/syxg2026-hybrid",
+    "AnchorFile": "syxg2026-hybrid.dll",
+    "VersionFile": "syxg2026-hybrid.version.json",
+    "PublicKeyXml": "<RSAKeyValue><Modulus>vidOAREgvkf3Glua/rXJJukqIdzcy8fKg2YqMEVUVBHTt78YpmuuByymXc3sCAt367Hp5f3hhV5Jq6029tRmPMHd9juVHSOHeBGHipp7QMYoNh7v1Q9c6cSedyxOqZuK00QhgSzeLT76nVaOETVLbknf4NI8Mor7C2l4y1NYa58Z1mLgORqwjJ0InpecM9/O+KkjET+k7egcvTYCZ4MCmfGQ9UfS/edfa32XAaa8yeBkb1jlixDP/DcRVnMvwnPAG8f3LbtuYNjWf4T3p7qoLU6xnxq0M3Pw6KUj9AB6XUnJqwO26HHLHgbglzA4uruWfMwKCLenf7TQAPWh0NbQxf3Y13XUcvbO8V4eN9BAc+XeDY73HBE6z0g25mKkAtcWu+SGUquC07QAIvxFXzXBkkkHhbwbysvmpeY4QXua4llSRIWN8AN+x20/cMWPUIGEWXOBlraneIGq4Y1thgUbb4fsnWPh+IEBhazPw7p5wOW+Ff90jJlXd055B+IN+l05</Modulus><Exponent>AQAB</Exponent></RSAKeyValue>",
+    "AllowedTargetFiles": [
+      "sxgbnw6l.tbl",
+      "sxgdat6l.tbl",
+      "Sxgpvknl.vxd",
+      "sxgsgknl.vxd",
+      "syxg2006le-engine.bin",
+      "syxg2026-hybrid.dll",
+      "syxg2026-sg-worker.exe",
+      "syxg2026-vl-worker.exe",
+      "syxg50-engine.bin",
+      "syxg2026-hybrid.version.json"
+    ]
+  },
+  {
+    "Id": "OnjResearch.Mu2026Hybrid",
+    "DisplayName": "Mu2026 Hybrid",
+    "Slug": "mu2026-hybrid",
+    "Repository": "OnjLouis/mu2026-hybrid",
+    "AnchorFile": "mu2026-hybrid.dll",
+    "VersionFile": "mu2026-hybrid.version.json",
+    "PublicKeyXml": "<RSAKeyValue><Modulus>1WgspwnmzyFLyxAM2tdrPG1VVDm5RZvu4G4OFgpTUNJAAag1PMEB2VVY2Aqy3dY3qvGNAjObhLvAG2IrIo36fFswYHNgSyPahoOV9IgwtqMHmvLzTRHEA+koOAdoJfglO2PtGIDzJpI6MuIblUgUiZCa8K7E79Kbk1C9HGQn/+Yl9zQp7i767ddhbQdhcz4LDQSoaXLDzzl5LMTr5iq8NfSAKqBVhLWcI57gg3/KEA7aXNdgvXuXPMcA61KDaV65cydkWV3Zr6nHapYFcQjcwZpaoRv4MvKH/Gg845jxUafJHHzjiKuz2jH3wF1u0Pao3Bq23sChIESWZZ715iMfeQ==</Modulus><Exponent>AQAB</Exponent></RSAKeyValue>",
+    "AllowedTargetFiles": [
+      "mu2026-hybrid.dll",
+      "mu2000-engine.bin",
+      "mu2026-vl-worker.exe",
+      "mu2026-sg-worker.exe",
+      "MU-Engine-LICENSE.txt",
+      "MU-Engine-NOTICE.txt",
+      "Wrapper-LICENSE.txt",
+      "mu2026-hybrid.version.json"
+    ]
+  }
+]

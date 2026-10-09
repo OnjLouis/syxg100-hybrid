@@ -299,6 +299,17 @@ WINEPREFIX="$HOME/.wine-syxg" WINEARCH=wow64 wine /path/to/vst-host.exe</pre>
 
   <h2>Updating</h2>
 
+  <p>Linux users can run <code>sh ./Update-YamahaHybrids.sh</code> without
+  PowerShell or Wine. Keep the accompanying Python script and product/key JSON
+  together. Python 3.9+ and OpenSSL are required. See the
+  <a href="Linux-Updater.html">Linux updater guide</a> for commands, signed
+  verification, rollback and limits. Synth audio and version are unchanged.</p>
+
+  <p>If a master-volume fade is missing in Falcosoft's VST output, disable
+  Device settings, Mixer, <strong>Use Sysex for Volume/Balance</strong>, keep
+  MIDI-file SysEx enabled and replay from the beginning. Controlled host tests
+  and the reporter's Wine retest confirmed that this restores message delivery.</p>
+
   <p>Close Foobar2000, REAPER, VSTHost, and any other program using the synth,
   then run <code>Update Yamaha Hybrids.cmd</code>. The updater can live beside
   this product folder, inside it, or in a shared parent folder containing both

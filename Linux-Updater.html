@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Yamaha Hybrid Linux Updater</title>
+<style>body{font-family:system-ui,sans-serif;line-height:1.6;max-width:52rem;margin:2rem auto;padding:0 1rem;color:#202020;background:#fff}pre{white-space:pre-wrap;overflow-wrap:anywhere;padding:1rem;background:#f1f1f1}a{color:#0645ad}</style></head>
+<body><main>
+<h1>Yamaha Hybrid Linux Updater 1.2.0</h1>
+<p>This native Linux updater checks existing S-YXG100 Hybrid, S-YXG2026 Hybrid
+and Mu2026 Hybrid installations. It needs Python 3.9 or later and the OpenSSL
+command-line tool. It does not need PowerShell or Wine to perform an update;
+Wine is still needed to run the Windows synth. macOS is not tested or supported
+by this updater.</p>
+<h2>Install the updater</h2>
+<p>Keep these three files together beside the synth folder or in a shared parent:</p>
+<ul><li>Update-YamahaHybrids.sh</li><li>Update-YamahaHybrids.py</li>
+<li>yamaha-update-products.json (product identities and public verification keys)</li></ul>
+<p>It searches its own folder and at most two child levels. A product archive's
+<code>VST</code> folder is supported. It does not install an absent synth. It
+refuses symbolic-link destinations and does not follow linked subfolders.</p>
+<p>Close all audio hosts using the synths, open a terminal in the updater folder,
+then run:</p>
+<pre>sh ./Update-YamahaHybrids.sh</pre>
+<p>Release notes appear before a numbered Install or Cancel choice. The updater
+also asks you to confirm that audio hosts are closed. Linux can replace a loaded
+DLL without preventing an old host from continuing to use it, so closing hosts
+matters. The process check catches observed loaded synth files and active workers,
+but cannot guarantee detection of every bridge or a host started afterward.
+The updater never terminates hosts or changes the Wine prefix.</p>
+<h2>Commands and exit codes</h2>
+<pre>sh ./Update-YamahaHybrids.sh --help
+sh ./Update-YamahaHybrids.sh --check-only
+sh ./Update-YamahaHybrids.sh --search-directory "/path/to/synth folders"
+sh ./Update-YamahaHybrids.sh --install --non-interactive --hosts-closed</pre>
+<p><code>--check-only</code> never installs. Redirected or unattended execution
+never prompts; installation requires <code>--install --hosts-closed</code>.
+Exit code 0 means success or cancellation, 10 means an update is available but
+not installed, and 2 means failure or no detected installation.</p>
+<h2>Verification and rollback</h2>
+<p>Only stable synth-family releases are selected. Research previews and the
+separate updater release are ignored. RSA/SHA-256 signature verification is
+mandatory, followed by the signed ZIP and individual file hashes. Invalid or
+missing signatures fail closed. File allowlists, archive entry and size limits,
+and HTTPS-only downloads restrict what a package can replace.</p>
+<p>Updates preserve unrelated files, ROMs not listed in the signed manifest,
+user configuration, and existing file permissions. A partial replacement failure
+restores replaced files and removes newly introduced files automatically. The
+version marker is committed last. No gain, routing or sound-engine setting is
+changed by the updater itself.</p>
+<p>Rollback ZIPs live below
+<code>${XDG_STATE_HOME:-$HOME/.local/state}/onj-research/yamaha-hybrid-updater/</code>,
+in a product and installation-specific folder. One rollback ZIP is kept per
+installation and two small run logs are kept. ZIPs are not loose plug-ins.
+If automatic rollback fails, preserve the reported ZIP and log, keep hosts closed,
+and report the failure rather than retrying repeatedly. A power loss or forced
+process termination cannot run automatic rollback; the ZIP's
+<code>rollback.json</code> records original locations and whether each file existed.</p>
+<p>There is no automatic elevation, package-manager installation, or third-party
+Python dependency. Signature verification uses the installed OpenSSL tool.
+Only public keys are included. Releases still contain Windows synths; the updater
+does not convert them into native Linux instruments.</p>
+<h2>Updating these scripts</h2>
+<p>Existing signed runtime packages continue to use their original Windows
+updater file list, preserving compatibility with older installations. For now,
+obtain newer Linux updater scripts from the
+<a href="https://github.com/OnjLouis/syxg2026-hybrid/releases/tag/updater-v1.2.0">separate updater release</a>
+and replace the three files together. Do not add new files to an older updater's
+signed manifest locally or disable signature checks.</p>
+<h2>Falcosoft master-volume fades</h2>
+<p>If a song's closing fade is missing in Falcosoft MIDI Player's VST output,
+open Device settings, Mixer, and disable <strong>Use Sysex for Volume/Balance</strong>.
+Keep MIDI-file SysEx enabled and replay the song from the beginning. With the
+checkbox enabled, controlled Falcosoft 6.6 tests withheld FatPizz's original Yamaha
+master-volume messages from the plug-in. Disabling it restored their delivery and
+the fade. This is a host-output setting, not a requirement to disable SysEx for
+external MIDI equipment.</p>
+<h2>Test coverage and limits</h2>
+<p>Tested on Linux with Python 3.10 and OpenSSL 3.0, including real published
+signed packages for all three families. Tests cover unsafe paths, symbolic links,
+signature rejection, stable-family selection, package and file hashes, simulated
+replacement failure, rollback, permissions, bounded discovery, process checks,
+concurrent execution and unattended operation. Distribution-specific packaging,
+macOS and every possible Wine/bridge process layout remain unverified.</p>
+<p>These updater files contain no Yamaha ROMs, binaries, tables or MIDI songs.
+The updater code uses the repository's MIT licence.</p>
+</main></body></html>

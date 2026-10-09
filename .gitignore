@@ -4,3 +4,5 @@
 *.dll
 *.exe
 *.wav
+__pycache__/
+*.pyc

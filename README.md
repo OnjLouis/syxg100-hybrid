@@ -1,5 +1,13 @@
 # S-YXG100 Hybrid
 
+## Native Linux Updater 1.2.0
+
+Run `sh ./Update-YamahaHybrids.sh` with its Python script and product/key JSON
+alongside it. Python 3.9+ and OpenSSL are required; PowerShell and Wine are not
+needed for updating. See [Linux-Updater.html](Linux-Updater.html). This separate
+updater release leaves synth audio and version unchanged. It supports the stable
+signed updates of all three hybrid families and preserves unrelated files.
+
 ## Version 0.1.8: Preserve Native VL Voice Edits
 
 Late-starting VL/PVL workers now replay bank/program selection and native
