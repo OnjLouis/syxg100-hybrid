@@ -1,5 +1,18 @@
 # S-YXG100 Hybrid
 
+## Version 0.1.8: Preserve Native VL Voice Edits
+
+Late-starting VL/PVL workers now replay bank/program selection and native
+voice edits in their original order, then restore current controllers without
+reloading the preset. This fixes Timeless's ending: Volume Expression Mode
+is no longer erased, so CC11 fades do not revert to breath-controlled timbre
+or jump in level. Intentional later program changes still reload normally.
+Full-volume gain, master-volume handling, SG and effects are unchanged.
+
+Setup history remains bounded; capacity exhaustion uses the existing current
+voice snapshot fallback. This does not correct a host that omits SysEx.
+The separate Falcosoft-on-Wine fade report remains under investigation.
+
 ## Version 0.1.7: Master-Volume Fades
 
 XG and Universal Real-Time Master Volume now affect the external VL/PVL

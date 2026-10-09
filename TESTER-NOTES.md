@@ -1,11 +1,13 @@
 # S-YXG100 Hybrid Preservation Tester Notes
 
-## Current package: 0.1.7
+## Current package: 0.1.8
 
-This update makes VL/PVL follow XG and Universal Real-Time Master Volume.
-Compare FatPizz's closing fade and confirm full-volume playback is unchanged.
-SG is not attenuated twice; reverb and other effects retain natural tails.
-The external-source curve is not an exact Yamaha hardware envelope.
+This update preserves native voice edits when a VL/PVL worker starts later
+in a song. Compare Timeless's closing lead: CC11 should retain Volume
+Expression Mode without the previous timbre/level jumps. Intentional later
+program changes still reload presets normally. Full-volume gain, SG, effects
+and master-volume handling are unchanged. The separate Falcosoft-on-Wine
+fade report is not claimed fixed.
 
 The preceding release restores converted MU-exclusive sub-banks (including Anathema),
 corrects SFX Techno Kit selection, and translates independent MU distortion

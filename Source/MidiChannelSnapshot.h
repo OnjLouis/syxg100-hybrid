@@ -37,12 +37,14 @@ public:
     }
 
     template <typename Send>
-    void replay(Send&& send) const
+    void replay(Send&& send, bool includeVoiceSelection = true) const
     {
-        sendControllerIfSeen(send, 0);
-        sendControllerIfSeen(send, 32);
-        if (programSeen)
-            send(program);
+        if (includeVoiceSelection) {
+            sendControllerIfSeen(send, 0);
+            sendControllerIfSeen(send, 32);
+            if (programSeen)
+                send(program);
+        }
         for (std::uint8_t controller = 1; controller < 128; ++controller) {
             if (controller == 6 || controller == 32 || controller == 38
                 || (controller >= 96 && controller <= 101)) {

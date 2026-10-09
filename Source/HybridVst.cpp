@@ -236,6 +236,7 @@ struct WrapperState {
     bool vlAvailable {};
     bool sgAvailable {};
     bool vlSetupHistoryFrozen {};
+    bool vlSetupHistoryComplete {true};
     bool sgSetupHistoryFrozen {};
     bool xgEffectsBridgeAvailable {};
     bool vlRenderDiagnosticWritten {};
@@ -693,6 +694,7 @@ void clearVlSetup(WrapperState& wrapper)
 {
     wrapper.vlSetupEventCount = 0;
     wrapper.vlSetupSysexSize = 0;
+    wrapper.vlSetupHistoryComplete = true;
 }
 
 void clearSgSetup(WrapperState& wrapper)
@@ -707,18 +709,30 @@ bool retainVlShort(WrapperState& wrapper, std::uint8_t channel,
 {
     // RPN and NRPN values depend on the exact selector/data-entry order.
     // Replacing earlier messages by controller number corrupts that sequence.
-    return hybrid::retainOrderedSetupEvent(
+    const auto retained = hybrid::retainOrderedSetupEvent(
         wrapper.vlSetupEvents, wrapper.vlSetupEventCount, VlSetupEvent {
         VlSetupKind::shortMessage, channel, message, 0, 0
     });
+    wrapper.vlSetupHistoryComplete &= retained;
+    return retained;
+}
+
+bool isVlVoiceSelection(std::uint32_t message)
+{
+    const auto operation = message & 0xf0;
+    const auto controller = (message >> 8) & 0x7f;
+    return operation == 0xc0
+        || (operation == 0xb0 && (controller == 0 || controller == 32));
 }
 
 bool retainVlSysex(WrapperState& wrapper,
                    std::span<const std::uint8_t> bytes)
 {
     if (wrapper.vlSetupEventCount == wrapper.vlSetupEvents.size()
-        || bytes.size() > wrapper.vlSetupSysex.size() - wrapper.vlSetupSysexSize)
+        || bytes.size() > wrapper.vlSetupSysex.size() - wrapper.vlSetupSysexSize) {
+        wrapper.vlSetupHistoryComplete = false;
         return false;
+    }
     const auto offset = wrapper.vlSetupSysexSize;
     std::copy(bytes.begin(), bytes.end(),
               wrapper.vlSetupSysex.begin() + offset);
@@ -741,8 +755,7 @@ void activateNativeVlBulkChannel(WrapperState& wrapper)
     for (const auto message : activationMessages) {
         wrapper.vlChannelSnapshots[channel].observe(message);
         wrapper.status.observeShortMessage(message, true, false);
-        if (!wrapper.vlSetupHistoryFrozen
-            && !retainVlShort(wrapper, channel, message)) {
+        if (!retainVlShort(wrapper, channel, message)) {
             wrapper.vlSetupHistoryFrozen = true;
         }
     }
@@ -854,12 +867,14 @@ void replayVlSetup(WrapperState& wrapper, std::uint8_t voice,
                               nativeChannel);
     }
     if (replaySnapshot) {
+        // The ordered history already applied bank/program followed by voice
+        // edits. Re-selecting that preset here would silently erase the edits.
         wrapper.vlChannelSnapshots[channel].replay(
             [&](std::uint32_t message) {
                 const auto nativeMessage = hybrid::remapVlShortMessage(
                     message, nativeChannel);
                 client->sendShort(nativeMessage);
-            });
+            }, !wrapper.vlSetupHistoryComplete);
     }
 }
 
@@ -947,7 +962,7 @@ void applyPluginVoice(WrapperState& wrapper,
         (void)wrapper.router.routeShortMessage(message);
         wrapper.vlChannelSnapshots[channel].observe(message);
         wrapper.status.observeShortMessage(message, true, false);
-        if (!wrapper.vlSetupHistoryFrozen
+        if ((!wrapper.vlSetupHistoryFrozen || isVlVoiceSelection(message))
             && !retainVlShort(wrapper, channel, message)) {
             wrapper.vlSetupHistoryFrozen = true;
         }
@@ -1122,6 +1137,12 @@ vst2::IntPtr processEvents(WrapperState& wrapper, const vst2::Events* events)
                 if (destination != hybrid::MidiDestination::xg) {
                     try {
                         wrapper.vlChannelSnapshots[channel].observe(packed);
+                        // Preserve selections relative to subsequent native
+                        // edits, including workers first used later in a song.
+                        const auto voiceSelection = isVlVoiceSelection(packed);
+                        if (voiceSelection
+                            && !retainVlShort(wrapper, channel, packed))
+                            wrapper.vlSetupHistoryFrozen = true;
                         if (isNoteOn(packed)) {
                             const auto allocation = wrapper.vlVoiceAllocator.noteOn(
                                 channel, midiNote(packed));
@@ -1224,7 +1245,8 @@ vst2::IntPtr processEvents(WrapperState& wrapper, const vst2::Events* events)
                                     delivered = true;
                                 }
                             }
-                            if (!delivered && !wrapper.vlSetupHistoryFrozen
+                            if (!delivered && !voiceSelection
+                                && !wrapper.vlSetupHistoryFrozen
                                 && !retainVlShort(wrapper, channel,
                                                   packed)) {
                                 wrapper.vlSetupHistoryFrozen = true;

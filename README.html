@@ -31,11 +31,11 @@
 <body>
 <main>
   <h1>S-YXG100 Hybrid</h1>
-  <h2>Current package 0.1.7</h2>
-  <p>This update corrects master-volume fades for VL/PVL, including the closing
-  lead in FatPizz. SG retains its native volume handling and effects retain
-  natural tails. Full-volume gain is unchanged. The external-source envelope
-  is not a claim of bit-identical Yamaha hardware behaviour.</p>
+  <h2>Current package 0.1.8</h2>
+  <p>This update preserves native VL voice edits when a worker first starts
+  later in a song. Timeless's closing volume-expression fade no longer
+  reverts to breath-controlled timbre or jumps in level. Full-volume gain,
+  master-volume handling, SG and the existing effects path are unchanged.</p>
   <p>MU-derived AWM voices replace the classic small fallback sound set.
   VL/PVL, SG, and existing software effects routing remain. S-YXG2026
   retains 2006LE precedence for its supported voices.</p>
@@ -97,6 +97,18 @@
   their natural tails. The external source uses a power-law envelope; Yamaha's
   quantized native envelope may differ at intermediate levels.
   This is not a claim of bit-identical hardware behaviour.</p>
+  <h2>VL setup correction</h2>
+  <p>This release preserves bank/program selection and subsequent native
+  VL voice edits in their original order when a worker first starts later in a
+  song. Restoring current controllers no longer reloads
+  the same preset and erases those edits. This includes a voice's expression
+  mode: volume-expression fades should remain volume fades, rather than
+  reverting to breath-controlled timbre. Intentional later program changes
+  still reload presets normally; full-volume gain is unchanged.</p>
+  <p>Setup retention remains bounded. If its existing event or SysEx capacity
+  is exhausted, the current bank/program snapshot is used as a fallback;
+  arbitrary unbounded edit histories are not guaranteed. This release is
+  not a fix for a host that filters or omits MIDI SysEx.</p>
   <h2>Conversion credits and licence</h2>
   <p>Thanks to Soundshock for SXG-Create, NightFright2k19 for
   <a href="https://github.com/NightFright2k19/SXG-Create-NF">SXG-Create-NF</a>,

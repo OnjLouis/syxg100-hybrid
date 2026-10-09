@@ -40,4 +40,32 @@ int main()
         midi(0xe2, 0, 96),
     };
     assert(replayed == expected);
+
+    // Ordered setup has already selected the voice and then edited it through
+    // SysEx. Sending the program again here would discard those edits.
+    replayed.clear();
+    snapshot.replay([&](std::uint32_t message) {
+        replayed.push_back(message);
+    }, false);
+    assert(replayed == std::vector<std::uint32_t>(
+        expected.begin() + 3, expected.end()));
+
+    snapshot.observe(midi(0xb2, 11, 32));
+    replayed.clear();
+    snapshot.replay([&](std::uint32_t message) {
+        replayed.push_back(message);
+    }, false);
+    assert(replayed[1] == midi(0xb2, 11, 32));
+
+    // Model a native preset reload: it resets the voice's SysEx expression
+    // mode. Controller restoration must not repeat that reload.
+    bool volumeExpression = true;
+    auto restore = [&](std::uint32_t message) {
+        if ((message & 0xf0) == 0xc0)
+            volumeExpression = false;
+    };
+    snapshot.replay(restore, false);
+    assert(volumeExpression);
+    snapshot.replay(restore);
+    assert(!volumeExpression);
 }
